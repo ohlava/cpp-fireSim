@@ -7,13 +7,14 @@ void initializeTiles(std::vector<sf::RectangleShape>& tiles, int windowHeight);
 void handleEvents(sf::RenderWindow& window, std::vector<sf::RectangleShape>& buttons, std::vector<sf::RectangleShape>& tiles);
 void drawElements(sf::RenderWindow& window, const std::vector<sf::RectangleShape>& buttons, const std::vector<sf::RectangleShape>& tiles);
 
-const int NUM_TILES_PER_ROW = 20;
+const int NUM_TILES_PER_AXIS = 20;
+const int MARGIN_FOR_TILES = 2;
 
 int main() {
-    sf::RenderWindow window(sf::VideoMode(960, 540), "Fire Spread Simulator", sf::Style::Titlebar | sf::Style::Close);
+    sf::RenderWindow window(sf::VideoMode(1000, 500), "Fire Spread Simulator", sf::Style::Titlebar | sf::Style::Close);
 
     std::vector<sf::RectangleShape> buttons;
-    initializeButtons(buttons, window.getSize().y / NUM_TILES_PER_ROW);
+    initializeButtons(buttons, window.getSize().y / NUM_TILES_PER_AXIS);
 
     std::vector<sf::RectangleShape> tiles;
     initializeTiles(tiles, window.getSize().y);
@@ -28,7 +29,7 @@ int main() {
 
 void initializeButtons(std::vector<sf::RectangleShape>& buttons, int tileSize) {
     int margin = 50;
-    int xPosition = NUM_TILES_PER_ROW * tileSize + margin;
+    int xPosition = NUM_TILES_PER_AXIS * tileSize + margin;
 
     // Initialize buttons with updated positions
     sf::RectangleShape button(sf::Vector2f(100, 50));
@@ -42,15 +43,22 @@ void initializeButtons(std::vector<sf::RectangleShape>& buttons, int tileSize) {
 }
 
 void initializeTiles(std::vector<sf::RectangleShape>& tiles, int windowHeight) {
-    // Calculate tile size based on window height
-    int tileSize = windowHeight / NUM_TILES_PER_ROW;
+    int allBordersSize = (NUM_TILES_PER_AXIS - 1) * MARGIN_FOR_TILES ; // there is one less border than number of tiles
+
+    // Calculate tile size based on window height, margin and number of tiles
+    int tileSize = (windowHeight - allBordersSize) / NUM_TILES_PER_AXIS;
 
     // Position tiles in a grid
-    for (int i = 0; i < NUM_TILES_PER_ROW; ++i) {
-        for (int j = 0; j < NUM_TILES_PER_ROW; ++j) {
+    for (int i = 0; i < NUM_TILES_PER_AXIS; ++i) {
+        for (int j = 0; j < NUM_TILES_PER_AXIS; ++j) {
             sf::RectangleShape tile(sf::Vector2f(tileSize, tileSize));
             tile.setFillColor(sf::Color::White);
-            tile.setPosition(i * tileSize, j * tileSize);
+
+            // Calculate position with margin
+            int posX = i * (tileSize + MARGIN_FOR_TILES);
+            int posY = j * (tileSize + MARGIN_FOR_TILES);
+            tile.setPosition(posX, posY);
+
             tiles.push_back(tile);
         }
     }

@@ -9,7 +9,7 @@ set(SOURCE_FILES
     main.cpp)
 
 # Find SFML
-find_package(SFML 2.6 COMPONENTS graphics audio REQUIRED)
+find_package(SFML 2.5 COMPONENTS graphics audio REQUIRED)
 
 # Include the SFML include directory
 include_directories(${SFML_INCLUDE_DIRS})
