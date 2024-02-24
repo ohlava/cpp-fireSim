@@ -6,7 +6,10 @@ set(CMAKE_CXX_STANDARD 17)
 # Set the path to the SFML directory
 set(SFML_DIR "/opt/homebrew/Cellar/sfml/2.6.1/lib/cmake/SFML")
 set(SOURCE_FILES
-    main.cpp)
+    main.cpp
+    worldClasses.h
+        worldGenerator.h
+)
 
 # Find SFML
 find_package(SFML 2.5 COMPONENTS graphics audio REQUIRED)
