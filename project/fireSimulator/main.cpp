@@ -4,31 +4,43 @@
 #include <iostream>
 #include <vector>
 
+#include "worldClasses.h"
+#include "worldGenerator.h"
+
+
 // Base class for simulations
 class Simulation {
-public:
-    virtual void update() = 0; // Update simulation state
-    virtual void reset() = 0;  // Reset simulation to initial state
+        protected:
+        World& world; // Reference to the shared world
+
+        public:
+        Simulation(World& world) : world(world) {}
+
+        virtual void update() = 0; // Update simulation state
+        virtual void reset() = 0;  // Reset simulation to its initial state
 };
 
 // Specific simulation
 class FireSpreadSimulation : public Simulation {
 public:
+    FireSpreadSimulation(World& world) : Simulation(world) {}
+
     void update() override {
-        // Update fire spread logic
+        // Implementation of the fire spread logic, interacting with the shared world
     }
 
     void reset() override {
-        // Reset fire spread simulation
+        // Reset the fire spread simulation state, possibly also resetting relevant parts of the world
     }
 };
 
+
+
+
 class Visualizer {
-    sf::RenderWindow window;
     std::vector<sf::RectangleShape> buttons;
     std::vector<sf::RectangleShape> tiles;
-    Simulation* simulation;
-    bool simulationRunning = false;
+
     int lastHighlightedTileIndex = -1;
 
     const int NUM_TILES_PER_AXIS = 20;
@@ -39,15 +51,20 @@ class Visualizer {
     sf::Color buttonDefaultColor = sf::Color::Green; // Default button color
     sf::Color buttonHighlightColor = sf::Color::Red; // Highlighted button color
 
+    Map* terrainMap = nullptr;
+
     void initializeButtons(int tileSize);
     void initializeTiles(int windowHeight);
-    bool handleEvents();
-    void drawElements();
 
 public:
-    Visualizer(Simulation* sim) : simulation(sim), window(sf::VideoMode(1000, 500), "Simulation", sf::Style::Titlebar | sf::Style::Close) {
+    Visualizer() : window(sf::VideoMode(1000, 500), "Simulation", sf::Style::Titlebar | sf::Style::Close) {
         initializeButtons(window.getSize().y / NUM_TILES_PER_AXIS);
         initializeTiles(window.getSize().y);
+    }
+
+    void setTerrainMap(Map& map) {
+        terrainMap = &map;
+        initializeTiles(window.getSize().y); // Re-initialize tiles with terrain map
     }
 
     // Methods to change colors dynamically if needed
@@ -61,7 +78,15 @@ public:
         buttonHighlightColor = highlightColor;
     }
 
-    void run();
+    sf::RenderWindow window;
+
+    bool isWindowOpen() const;
+    bool handleEvents();
+    void drawElements();
+
+    bool pollEvent(sf::Event &event);
+    void update();
+
 };
 
 void Visualizer::initializeButtons(int tileSize) {
@@ -81,16 +106,19 @@ void Visualizer::initializeButtons(int tileSize) {
 }
 
 void Visualizer::initializeTiles(int windowHeight) {
-    int allBordersSize = (NUM_TILES_PER_AXIS - 1) * MARGIN_FOR_TILES ; // there is one less border than number of tiles
+    if (!terrainMap) return; // Ensure terrainMap is set
 
-    // Calculate tile size based on window height, margin and number of tiles
-    int tileSize = (windowHeight - allBordersSize) / NUM_TILES_PER_AXIS;
+    int allBordersSize = (NUM_TILES_PER_AXIS - 1) * MARGIN_FOR_TILES; // there is one less border than number of tiles
+    int tileSize = (windowHeight - allBordersSize) / NUM_TILES_PER_AXIS; // Calculate tile size based on window height, margin and number of tiles
+    tiles.clear(); // Clear existing tiles if re-initializing
 
     // Position tiles in a grid
     for (int i = 0; i < NUM_TILES_PER_AXIS; ++i) {
         for (int j = 0; j < NUM_TILES_PER_AXIS; ++j) {
             sf::RectangleShape tile(sf::Vector2f(tileSize, tileSize));
-            tile.setFillColor(tileDefaultColor);
+            float terrainValue = (*terrainMap).data[i][j]; // Use terrain value for color
+            sf::Color grayScaleColor = sf::Color(terrainValue * 255, terrainValue * 255, terrainValue * 255);
+            tile.setFillColor(grayScaleColor);
 
             // Calculate position with margin
             int posX = i * (tileSize + MARGIN_FOR_TILES);
@@ -103,8 +131,6 @@ void Visualizer::initializeTiles(int windowHeight) {
 }
 
 bool Visualizer::handleEvents() {
-
-    // TODO make reequest for redrawing more sophisticated - based on also the simulation updates
     bool needRedraw = false;
     sf::Event event;
     sf::Vector2i mousePos = sf::Mouse::getPosition(window);
@@ -122,9 +148,6 @@ bool Visualizer::handleEvents() {
                     // TODO tell main logic about it - button functionality
 
                     needRedraw = true;
-                }
-                else {
-                    btn.setFillColor(buttonDefaultColor); // Reset to default color if not highlighted
                 }
             }
         }
@@ -167,30 +190,107 @@ void Visualizer::drawElements() {
     window.display();
 }
 
-void Visualizer::run() {
-    sf::Clock clock;
+bool Visualizer::isWindowOpen() const {
+    return window.isOpen();
+}
 
-    while (window.isOpen()) {
-        if (handleEvents()) {
-            drawElements();
-            clock.restart();
-        }
+bool Visualizer::pollEvent(sf::Event& event) {
+    return window.pollEvent(event);
+}
 
-        if (!window.hasFocus()) {
-            sf::sleep(sf::milliseconds(80)); // Sleep to reduce CPU usage
-        }
-
-        if (clock.getElapsedTime().asSeconds() > 1) { // If idle for more than a second, reduce the frequency of event polling
-            sf::sleep(sf::milliseconds(50));
-        }
+void Visualizer::update() {
+    // Combine existing draw and event handling logic
+    if (handleEvents()) {
+        drawElements();
     }
 }
 
 
 
+
+
+
+
+#include <SFML/Graphics.hpp>
+#include <SFML/Window.hpp>
+#include <SFML/System.hpp>
+#include <iostream>
+#include <vector>
+
+class MainLogic {
+private:
+    World world; // World object to hold the simulation state
+    Map terrainMap;
+
+    FireSpreadSimulation simulation; // The simulation logic
+    Visualizer visualizer; // The visualizer for rendering
+
+    enum class GameState {
+        PreStart, Running, Stopped
+    } state; // Game state
+
+public:
+    MainLogic(int worldWidth, int worldDepth) : world(worldWidth, worldDepth), terrainMap(worldWidth, worldDepth), simulation(world), visualizer(), state(GameState::PreStart) {
+        Random::InitState(static_cast<unsigned int>(time(nullptr)));
+        BaseTerrainGenerator generator(worldWidth, worldDepth);
+        terrainMap = generator.Generate(); // Store the generated map
+        visualizer.setTerrainMap(terrainMap);
+        visualizer.drawElements();
+    }
+
+    void run() {
+        // CHANGE THIS
+        Random::InitState(static_cast<unsigned int>(time(nullptr)));
+        BaseTerrainGenerator generator(100, 100);
+        Map terrainMap = generator.Generate();
+        // CHANGE THIS
+
+        // Main loop to handle game state transitions and updates
+        sf::Clock clock;
+        while (visualizer.isWindowOpen()) {
+            if (visualizer.handleEvents()) {
+                visualizer.drawElements();
+                clock.restart();
+            }
+
+            if (!visualizer.window.hasFocus()) {
+                sf::sleep(sf::milliseconds(80)); // Sleep to reduce CPU usage
+            }
+
+            if (clock.getElapsedTime().asSeconds() > 1) { // If idle for more than a second, reduce the frequency of event polling
+                sf::sleep(sf::milliseconds(50));
+            }
+        }
+    }
+
+private:
+    void handleInput() {
+        // Handle user input to change game state or interact with the world
+        // This could involve starting/stopping the simulation, setting tiles on fire, etc.
+    }
+
+    void update() {
+        // Update the simulation and visualizer based on the current game state
+        switch (state) {
+            case GameState::PreStart:
+                // Allow user to modify the world (e.g., set tiles on fire)
+                break;
+            case GameState::Running:
+                simulation.update(); // Update the simulation state
+                // Pass updated world state to visualizer here
+                break;
+            case GameState::Stopped:
+                // Possibly handle post-simulation logic
+                break;
+        }
+        visualizer.update(); // Update the visualization based on the new simulation state
+    }
+
+    // Other methods as needed for game logic
+};
+
 int main() {
-    FireSpreadSimulation sim;
-    Visualizer vis(&sim);
-    vis.run();
+    MainLogic logic(100, 100); // Create the game logic with a 100x100 world
+    logic.run(); // Run the game
     return 0;
 }
