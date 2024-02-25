@@ -53,7 +53,7 @@ class Visualizer {
     sf::Color buttonDefaultColor = sf::Color::Green; // Default button color
     sf::Color buttonHighlightColor = sf::Color::Red; // Highlighted button color
 
-    Map* terrainMap = nullptr;
+    Map<float>* terrainMap = nullptr;
 
     void initializeButtons(int tileSize);
     void initializeTiles(int windowHeight);
@@ -64,7 +64,7 @@ public:
         initializeTiles(window.getSize().y);
     }
 
-    void setTerrainMap(Map& map) {
+    void setTerrainMap(Map<float>& map) {
         terrainMap = &map;
         initializeTiles(window.getSize().y); // Re-initialize tiles with terrain map
     }
@@ -213,7 +213,7 @@ void Visualizer::update() {
 class MainLogic {
 private:
     World world; // World object to hold the simulation state
-    Map terrainMap;
+    Map<float> terrainMap;
 
     FireSpreadSimulation simulation; // The simulation logic
     Visualizer visualizer; // The visualizer for rendering
@@ -225,18 +225,16 @@ private:
 public:
     MainLogic(int worldWidthAndDepth) : world(worldWidthAndDepth, worldWidthAndDepth), terrainMap(worldWidthAndDepth, worldWidthAndDepth), simulation(world), visualizer(), state(GameState::PreStart) {
 
-
-        Random::InitState(static_cast<unsigned int>(time(nullptr)));
+        // TODO delete - make using world
         BaseTerrainGenerator btGenerator(worldWidthAndDepth, worldWidthAndDepth);
         terrainMap = btGenerator.Generate(); // Store the generated map
+        visualizer.setTerrainMap(terrainMap);
+        // TODO delete
 
-        LakeMapGenerator lakeMapGenerator(terrainMap, 0.15f);
-        Map lakeMap = lakeMapGenerator.Generate();
+        // TODO make using this
+        WorldGenerator worldGenerator(worldWidthAndDepth, worldWidthAndDepth, 0.15f, 3);
+        auto world = worldGenerator.Generate();
 
-        RiverMapGenerator riverMapGenerator(terrainMap, lakeMap, 3);
-        Map riverMap = riverMapGenerator.Generate();
-
-        visualizer.setTerrainMap(riverMap);
         visualizer.drawElements();
 
     }

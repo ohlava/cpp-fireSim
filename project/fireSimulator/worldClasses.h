@@ -102,7 +102,7 @@ private:
     VegetationType vegetation_;
 };
 
-// World class
+// World-class
 class World {
 public:
     World(int width, int depth) : width_(std::max(0, width)), depth_(std::max(0, depth)), weather_(0, 0) {
@@ -132,6 +132,14 @@ public:
             throw std::out_of_range("Coordinates are out of the grid bounds.");
         }
         return grid_[x][y];
+    }
+
+    void SetTileAt(int x, int y, Tile* tile) {
+        if (x < 0 || x >= width_ || y < 0 || y >= depth_) {
+            throw std::out_of_range("Coordinates are out of the grid bounds.");
+        }
+        delete grid_[x][y]; // Clean up the existing tile if necessary
+        grid_[x][y] = tile; // Place the new tile
     }
 
     std::vector<Tile*> GetNeighborTiles(Tile* tile, int distance = 1) {
