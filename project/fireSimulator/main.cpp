@@ -1,5 +1,6 @@
 #include <SFML/Graphics.hpp>
 #include <SFML/System.hpp> // Include for sf::sleep
+#include <SFML/Window.hpp>
 
 #include <iostream>
 #include <vector>
@@ -208,15 +209,6 @@ void Visualizer::update() {
 
 
 
-
-
-
-#include <SFML/Graphics.hpp>
-#include <SFML/Window.hpp>
-#include <SFML/System.hpp>
-#include <iostream>
-#include <vector>
-
 class MainLogic {
 private:
     World world; // World object to hold the simulation state
@@ -230,21 +222,15 @@ private:
     } state; // Game state
 
 public:
-    MainLogic(int worldWidth, int worldDepth) : world(worldWidth, worldDepth), terrainMap(worldWidth, worldDepth), simulation(world), visualizer(), state(GameState::PreStart) {
+    MainLogic(int worldWidthAndDepth) : world(worldWidthAndDepth, worldWidthAndDepth), terrainMap(worldWidthAndDepth, worldWidthAndDepth), simulation(world), visualizer(), state(GameState::PreStart) {
         Random::InitState(static_cast<unsigned int>(time(nullptr)));
-        BaseTerrainGenerator generator(worldWidth, worldDepth);
+        BaseTerrainGenerator generator(worldWidthAndDepth, worldWidthAndDepth);
         terrainMap = generator.Generate(); // Store the generated map
         visualizer.setTerrainMap(terrainMap);
         visualizer.drawElements();
     }
 
     void run() {
-        // CHANGE THIS
-        Random::InitState(static_cast<unsigned int>(time(nullptr)));
-        BaseTerrainGenerator generator(100, 100);
-        Map terrainMap = generator.Generate();
-        // CHANGE THIS
-
         // Main loop to handle game state transitions and updates
         sf::Clock clock;
         while (visualizer.isWindowOpen()) {
@@ -290,7 +276,7 @@ private:
 };
 
 int main() {
-    MainLogic logic(100, 100); // Create the game logic with a 100x100 world
+    MainLogic logic(20); // Create the game logic with a 100x100 world
     logic.run(); // Run the game
     return 0;
 }
