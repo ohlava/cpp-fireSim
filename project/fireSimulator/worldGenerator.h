@@ -335,10 +335,6 @@ public:
 
 
 // Main Generator of the entire terrain using different generators
-
-#include <chrono> // For std::chrono::system_clock
-#include <memory> // For std::unique_ptr
-
 class WorldGenerator {
 public:
     int width;
@@ -352,7 +348,7 @@ public:
         srand(std::chrono::system_clock::now().time_since_epoch().count()); // Seed the random number generator
     }
 
-    std::unique_ptr<World> Generate() {
+    std::shared_ptr<World> Generate() {
         BaseTerrainGenerator heightMapGenerator(width, depth);
         auto heightMap = heightMapGenerator.Generate();
 
@@ -372,8 +368,8 @@ public:
     }
 
 private:
-    std::unique_ptr<World> GenerateWorldFromMaps(const Map<float>& heightMap, const Map<int>& moistureMap, const Map<VegetationType>& vegetationMap) {
-        auto world = std::make_unique<World>(width, depth);
+    std::shared_ptr<World> GenerateWorldFromMaps(const Map<float>& heightMap, const Map<int>& moistureMap, const Map<VegetationType>& vegetationMap) {
+        auto world = std::make_shared<World>(width, depth);
 
         for (int x = 0; x < width; x++) {
             for (int y = 0; y < depth; y++) {
@@ -395,7 +391,3 @@ private:
         return world;
     }
 };
-
-
-
-

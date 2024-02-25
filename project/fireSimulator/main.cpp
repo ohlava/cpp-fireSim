@@ -3,11 +3,11 @@
 #include <SFML/Window.hpp>
 
 #include <iostream>
+#include <utility>
 #include <vector>
 
 #include "worldClasses.h"
 #include "worldGenerator.h"
-#include "perlin.h"
 
 
 // Base class for simulations
@@ -45,7 +45,6 @@ class Visualizer {
 
     int lastHighlightedTileIndex = -1;
 
-    const int NUM_TILES_PER_AXIS = 20;
     const int MARGIN_FOR_TILES = 2;
 
     sf::Color tileDefaultColor = sf::Color::White; // Default tile color
@@ -53,19 +52,20 @@ class Visualizer {
     sf::Color buttonDefaultColor = sf::Color::Green; // Default button color
     sf::Color buttonHighlightColor = sf::Color::Red; // Highlighted button color
 
-    Map<float>* terrainMap = nullptr;
+    std::shared_ptr<World> world;
+    const int tilesPerAxis = 20; // TODO delete / read from world size
 
     void initializeButtons(int tileSize);
     void initializeTiles(int windowHeight);
 
 public:
-    Visualizer() : window(sf::VideoMode(1000, 500), "Simulation", sf::Style::Titlebar | sf::Style::Close) {
-        initializeButtons(window.getSize().y / NUM_TILES_PER_AXIS);
-        initializeTiles(window.getSize().y);
+    Visualizer(std::shared_ptr<World> world) : window(sf::VideoMode(1000, 500), "Simulation", sf::Style::Titlebar | sf::Style::Close),
+                              world(world) {
     }
 
-    void setTerrainMap(Map<float>& map) {
-        terrainMap = &map;
+    void setWorld(std::shared_ptr<World> worldToSet) {
+        world = std::move(worldToSet);
+        initializeButtons(window.getSize().y / tilesPerAxis);
         initializeTiles(window.getSize().y); // Re-initialize tiles with terrain map
     }
 
@@ -93,7 +93,7 @@ public:
 
 void Visualizer::initializeButtons(int tileSize) {
     int margin = 50;
-    int xPosition = NUM_TILES_PER_AXIS * tileSize + margin;
+    int xPosition = tilesPerAxis * tileSize + margin;
 
     // Initialize buttons with updated positions
     sf::RectangleShape button(sf::Vector2f(100, 50));
@@ -108,17 +108,16 @@ void Visualizer::initializeButtons(int tileSize) {
 }
 
 void Visualizer::initializeTiles(int windowHeight) {
-    if (!terrainMap) return; // Ensure terrainMap is set
 
-    int allBordersSize = (NUM_TILES_PER_AXIS - 1) * MARGIN_FOR_TILES; // there is one less border than number of tiles
-    int tileSize = (windowHeight - allBordersSize) / NUM_TILES_PER_AXIS; // Calculate tile size based on window height, margin and number of tiles
+    int allBordersSize = (tilesPerAxis - 1) * MARGIN_FOR_TILES; // there is one less border than number of tiles
+    int tileSize = (windowHeight - allBordersSize) / tilesPerAxis; // Calculate tile size based on window height, margin and number of tiles
     tiles.clear(); // Clear existing tiles if re-initializing
 
     // Position tiles in a grid
-    for (int i = 0; i < NUM_TILES_PER_AXIS; ++i) {
-        for (int j = 0; j < NUM_TILES_PER_AXIS; ++j) {
+    for (int i = 0; i < tilesPerAxis; ++i) {
+        for (int j = 0; j < tilesPerAxis; ++j) {
             sf::RectangleShape tile(sf::Vector2f(tileSize, tileSize));
-            float terrainValue = (*terrainMap).data[i][j]; // Use terrain value for color
+            float terrainValue = world->GetTileAt(i, j)->GetHeight(); // Use terrain value for color
             sf::Color grayScaleColor = sf::Color(terrainValue * 255, terrainValue * 255, terrainValue * 255);
             tile.setFillColor(grayScaleColor);
 
@@ -212,10 +211,10 @@ void Visualizer::update() {
 
 class MainLogic {
 private:
-    World world; // World object to hold the simulation state
+    std::shared_ptr<World> world; // World object to hold the simulation state
     Map<float> terrainMap;
 
-    FireSpreadSimulation simulation; // The simulation logic
+    //FireSpreadSimulation simulation; // The simulation logic TODO add to constructor in MainLogic
     Visualizer visualizer; // The visualizer for rendering
 
     enum class GameState {
@@ -223,20 +222,13 @@ private:
     } state; // Game state
 
 public:
-    MainLogic(int worldWidthAndDepth) : world(worldWidthAndDepth, worldWidthAndDepth), terrainMap(worldWidthAndDepth, worldWidthAndDepth), simulation(world), visualizer(), state(GameState::PreStart) {
+    MainLogic(int worldWidthAndDepth) : world(nullptr), terrainMap(worldWidthAndDepth, worldWidthAndDepth),
+                                        visualizer(std::make_shared<World>(worldWidthAndDepth, worldWidthAndDepth)), state(GameState::PreStart) {
 
-        // TODO delete - make using world
-        BaseTerrainGenerator btGenerator(worldWidthAndDepth, worldWidthAndDepth);
-        terrainMap = btGenerator.Generate(); // Store the generated map
-        visualizer.setTerrainMap(terrainMap);
-        // TODO delete
-
-        // TODO make using this
         WorldGenerator worldGenerator(worldWidthAndDepth, worldWidthAndDepth, 0.15f, 3);
-        auto world = worldGenerator.Generate();
-
+        world = worldGenerator.Generate();
+        visualizer.setWorld(world);
         visualizer.drawElements();
-
     }
 
     void run() {
@@ -271,7 +263,7 @@ private:
                 // Allow user to modify the world (e.g., set tiles on fire)
                 break;
             case GameState::Running:
-                simulation.update(); // Update the simulation state
+                //simulation.update(); // Update the simulation state
                 // Pass updated world state to visualizer here
                 break;
             case GameState::Stopped:
