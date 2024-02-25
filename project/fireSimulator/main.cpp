@@ -7,6 +7,7 @@
 
 #include "worldClasses.h"
 #include "worldGenerator.h"
+#include "perlin.h"
 
 
 // Base class for simulations
@@ -223,11 +224,21 @@ private:
 
 public:
     MainLogic(int worldWidthAndDepth) : world(worldWidthAndDepth, worldWidthAndDepth), terrainMap(worldWidthAndDepth, worldWidthAndDepth), simulation(world), visualizer(), state(GameState::PreStart) {
+
+
         Random::InitState(static_cast<unsigned int>(time(nullptr)));
-        BaseTerrainGenerator generator(worldWidthAndDepth, worldWidthAndDepth);
-        terrainMap = generator.Generate(); // Store the generated map
-        visualizer.setTerrainMap(terrainMap);
+        BaseTerrainGenerator btGenerator(worldWidthAndDepth, worldWidthAndDepth);
+        terrainMap = btGenerator.Generate(); // Store the generated map
+
+        LakeMapGenerator lakeMapGenerator(terrainMap, 0.15f);
+        Map lakeMap = lakeMapGenerator.Generate();
+
+        RiverMapGenerator riverMapGenerator(terrainMap, lakeMap, 3);
+        Map riverMap = riverMapGenerator.Generate();
+
+        visualizer.setTerrainMap(riverMap);
         visualizer.drawElements();
+
     }
 
     void run() {

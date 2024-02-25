@@ -9,6 +9,7 @@ set(SOURCE_FILES
     main.cpp
     worldClasses.h
         worldGenerator.h
+        perlin.h
 )
 
 # Find SFML
