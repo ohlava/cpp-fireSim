@@ -176,6 +176,13 @@ public:
         weather_.Update();
     }
 
+    int TilesOnSide() {
+        if (width_ != depth_) {
+            throw std::runtime_error("There could be a problem, sizes of sides are not the same");
+        }
+        return width_;
+    }
+
 private:
     int width_, depth_;
     std::vector<std::vector<Tile*>> grid_; // 2D grid of Tile pointers

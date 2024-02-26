@@ -53,19 +53,18 @@ class Visualizer {
     sf::Color buttonHighlightColor = sf::Color::Red; // Highlighted button color
 
     std::shared_ptr<World> world;
-    const int tilesPerAxis = 20; // TODO delete / read from world size
 
     void initializeButtons(int tileSize);
     void initializeTiles(int windowHeight);
+    sf::Color getTileColor(int worldWidthPosition, int worldDepthPosition);
 
 public:
-    Visualizer(std::shared_ptr<World> world) : window(sf::VideoMode(1000, 500), "Simulation", sf::Style::Titlebar | sf::Style::Close),
-                              world(world) {
+    Visualizer(std::shared_ptr<World> world) : window(sf::VideoMode(1000, 500), "Simulation", sf::Style::Titlebar | sf::Style::Close), world(world) {
     }
 
     void setWorld(std::shared_ptr<World> worldToSet) {
         world = std::move(worldToSet);
-        initializeButtons(window.getSize().y / tilesPerAxis);
+        initializeButtons(window.getSize().y / world->TilesOnSide());
         initializeTiles(window.getSize().y); // Re-initialize tiles with terrain map
     }
 
@@ -93,7 +92,7 @@ public:
 
 void Visualizer::initializeButtons(int tileSize) {
     int margin = 50;
-    int xPosition = tilesPerAxis * tileSize + margin;
+    int xPosition = world->TilesOnSide() * tileSize + margin;
 
     // Initialize buttons with updated positions
     sf::RectangleShape button(sf::Vector2f(100, 50));
@@ -109,17 +108,16 @@ void Visualizer::initializeButtons(int tileSize) {
 
 void Visualizer::initializeTiles(int windowHeight) {
 
-    int allBordersSize = (tilesPerAxis - 1) * MARGIN_FOR_TILES; // there is one less border than number of tiles
-    int tileSize = (windowHeight - allBordersSize) / tilesPerAxis; // Calculate tile size based on window height, margin and number of tiles
+    int allBordersSize = (world->TilesOnSide() - 1) * MARGIN_FOR_TILES; // there is one less border than number of tiles
+    int tileSize = (windowHeight - allBordersSize) / world->TilesOnSide(); // Calculate tile size based on window height, margin and number of tiles
     tiles.clear(); // Clear existing tiles if re-initializing
 
     // Position tiles in a grid
-    for (int i = 0; i < tilesPerAxis; ++i) {
-        for (int j = 0; j < tilesPerAxis; ++j) {
+    for (int i = 0; i < world->TilesOnSide(); ++i) {
+        for (int j = 0; j < world->TilesOnSide(); ++j) {
             sf::RectangleShape tile(sf::Vector2f(tileSize, tileSize));
-            float terrainValue = world->GetTileAt(i, j)->GetHeight(); // Use terrain value for color
-            sf::Color grayScaleColor = sf::Color(terrainValue * 255, terrainValue * 255, terrainValue * 255);
-            tile.setFillColor(grayScaleColor);
+            sf::Color tileColor = getTileColor(i, j);
+            tile.setFillColor(tileColor);
 
             // Calculate position with margin
             int posX = i * (tileSize + MARGIN_FOR_TILES);
@@ -129,6 +127,12 @@ void Visualizer::initializeTiles(int windowHeight) {
             tiles.push_back(tile);
         }
     }
+}
+
+sf::Color Visualizer::getTileColor(int worldWidthPosition, int worldDepthPosition) {
+    float terrainValue = world->GetTileAt(worldWidthPosition, worldDepthPosition)->GetHeight(); // Use terrain value for color
+    sf::Color grayScaleColor = sf::Color(terrainValue * 255, terrainValue * 255, terrainValue * 255);
+    return grayScaleColor;
 }
 
 bool Visualizer::handleEvents() {
@@ -165,7 +169,8 @@ bool Visualizer::handleEvents() {
 
     if (newHighlightedTileIndex != lastHighlightedTileIndex) {
         if (lastHighlightedTileIndex != -1) {
-            tiles[lastHighlightedTileIndex].setFillColor(tileDefaultColor); // Revert color of previously highlighted tile
+            sf::Color tileColor = getTileColor(lastHighlightedTileIndex / world->TilesOnSide() , lastHighlightedTileIndex % world->TilesOnSide());
+            tiles[lastHighlightedTileIndex].setFillColor(tileColor); // Revert color of previously highlighted tile
         }
         if (newHighlightedTileIndex != -1) {
             tiles[newHighlightedTileIndex].setFillColor(tileHighlightColor); // Highlight new tile
@@ -277,7 +282,7 @@ private:
 };
 
 int main() {
-    MainLogic logic(20); // Create the game logic with a 100x100 world
+    MainLogic logic(100); // Create the game logic with a 100x100 world
     logic.run(); // Run the game
     return 0;
 }
