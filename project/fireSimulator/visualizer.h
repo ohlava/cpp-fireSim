@@ -24,7 +24,7 @@ class Visualizer {
     sf::Color getTileColor(int worldWidthPosition, int worldDepthPosition);
 
 public:
-    Visualizer(std::shared_ptr<World> world) : window(sf::VideoMode(1000, 500), "Simulation", sf::Style::Titlebar | sf::Style::Close), world(world) {
+    Visualizer(std::shared_ptr<World> world) : window(sf::VideoMode(800, 600), "Simulation", sf::Style::Titlebar | sf::Style::Close), world(world) {
     }
 
     void setWorld(std::shared_ptr<World> worldToSet) {
@@ -55,6 +55,8 @@ public:
 };
 
 void Visualizer::initializeButtons(int tileSize) {
+    loadFont();
+
     int margin = 50;
     int xPosition = world->TilesOnSide() * tileSize + margin;
 
@@ -78,8 +80,6 @@ void Visualizer::initializeButtons(int tileSize) {
 }
 
 void Visualizer::initializeTiles(int windowHeight) {
-
-    loadFont();
 
     int allBordersSize = (world->TilesOnSide() - 1) * MARGIN_FOR_TILES; // there is one less border than number of tiles
     int tileSize = (windowHeight - allBordersSize) / world->TilesOnSide(); // Calculate tile size based on window height, margin and number of tiles
