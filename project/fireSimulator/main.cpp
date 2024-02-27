@@ -8,39 +8,14 @@
 
 #include "worldClasses.h"
 #include "worldGenerator.h"
-
-
-// Base class for simulations
-class Simulation {
-        protected:
-        World& world; // Reference to the shared world
-
-        public:
-        Simulation(World& world) : world(world) {}
-
-        virtual void update() = 0; // Update simulation state
-        virtual void reset() = 0;  // Reset simulation to its initial state
-};
-
-// Specific simulation
-class FireSpreadSimulation : public Simulation {
-public:
-    FireSpreadSimulation(World& world) : Simulation(world) {}
-
-    void update() override {
-        // Implementation of the fire spread logic, interacting with the shared world
-    }
-
-    void reset() override {
-        // Reset the fire spread simulation state, possibly also resetting relevant parts of the world
-    }
-};
-
-
+#include "simulation.h"
 
 
 class Visualizer {
     std::vector<sf::RectangleShape> buttons;
+    std::vector<sf::Text> buttonLabels; // labels for buttons
+    sf::Font font;
+
     std::vector<sf::RectangleShape> tiles;
 
     int lastHighlightedTileIndex = -1;
@@ -54,6 +29,7 @@ class Visualizer {
 
     std::shared_ptr<World> world;
 
+    void loadFont();
     void initializeButtons(int tileSize);
     void initializeTiles(int windowHeight);
     sf::Color getTileColor(int worldWidthPosition, int worldDepthPosition);
@@ -85,34 +61,36 @@ public:
     void drawElements();
 
     int checkButtonClick(sf::Vector2i mousePos, bool applyFeedback);
-
     int getHoveredTileIndex(sf::Vector2i mousePos);
     void highlightTile(int index);
-
-    bool pollEvent(sf::Event &event);
-    void update();
-
 };
 
 void Visualizer::initializeButtons(int tileSize) {
     int margin = 50;
     int xPosition = world->TilesOnSide() * tileSize + margin;
 
+    const std::vector<std::string> buttonLabelsText = {"New World", "Start", "Stop", "Reset"};
     buttons.clear(); // Clear existing buttons if re-initializing
+    buttonLabels.clear();
 
     // Initialize buttons with updated positions
-    sf::RectangleShape button(sf::Vector2f(100, 50));
-    button.setPosition(xPosition, 100); // Positioned to the right of the tiles
-    button.setFillColor(buttonDefaultColor);
-    buttons.push_back(button);
+    for (size_t i = 0; i < buttonLabelsText.size(); ++i) {
+        sf::RectangleShape button(sf::Vector2f(140, 50));
+        button.setPosition(xPosition, 100 + i * 100); // Adjusted for correct positioning
+        button.setFillColor(buttonDefaultColor);
+        buttons.push_back(button);
 
-    sf::RectangleShape button2(sf::Vector2f(100, 50));
-    button2.setPosition(xPosition, 200);
-    button2.setFillColor(buttonDefaultColor);
-    buttons.push_back(button2);
+        // Create and initialize button label
+        sf::Text label(buttonLabelsText[i], font, 20); // Use the font loaded earlier
+        label.setPosition(xPosition + 10, 110 + i * 100); // Adjust label position
+        label.setFillColor(sf::Color::Black); // Set label color
+        buttonLabels.push_back(label);
+    }
 }
 
 void Visualizer::initializeTiles(int windowHeight) {
+
+    loadFont();
 
     int allBordersSize = (world->TilesOnSide() - 1) * MARGIN_FOR_TILES; // there is one less border than number of tiles
     int tileSize = (windowHeight - allBordersSize) / world->TilesOnSide(); // Calculate tile size based on window height, margin and number of tiles
@@ -135,6 +113,12 @@ void Visualizer::initializeTiles(int windowHeight) {
     }
 }
 
+void Visualizer::loadFont() {
+    if (!font.loadFromFile("./Trueno-wml2.otf")) {
+        std::cerr << "Error loading font" << std::endl;
+    }
+}
+
 sf::Color Visualizer::getTileColor(int worldWidthPosition, int worldDepthPosition) {
     float terrainValue = world->GetTileAt(worldWidthPosition, worldDepthPosition)->GetHeight(); // Use terrain value for color
     sf::Color grayScaleColor = sf::Color(terrainValue * 255, terrainValue * 255, terrainValue * 255);
@@ -148,8 +132,9 @@ void Visualizer::drawElements() {
         window.draw(tile);
     }
 
-    for (const auto& btn : buttons) {
-        window.draw(btn);
+    for (size_t i = 0; i < buttons.size(); ++i) {
+        window.draw(buttons[i]);
+        window.draw(buttonLabels[i]);
     }
 
     window.display();
@@ -227,7 +212,7 @@ private:
     std::shared_ptr<World> world; // World object to hold the simulation state
     int worldSize = 20;
 
-    //FireSpreadSimulation simulation; // The simulation logic TODO add to constructor in MainLogic
+    // FireSpreadSimulation simulation;
     Visualizer visualizer; // The visualizer for rendering
 
 
@@ -270,10 +255,18 @@ private:
                 auto mousePos = sf::Mouse::getPosition(visualizer.window);
                 int buttonIndex = visualizer.checkButtonClick(mousePos, true);
                 if (buttonIndex != -1) {
-                    std::cout << "button " << buttonIndex << " clicked" << std::endl;
-                    // Handle button click, for example, start or stop simulation
+                    std::cout << "Button " << buttonIndex << " clicked" << std::endl;
                     if (buttonIndex == 0) {
                         generateNewWorld();
+                    }
+                    else if (buttonIndex == 1) {
+                        startSimulation();
+                    }
+                    else if (buttonIndex == 2) {
+                        stopSimulation();
+                    }
+                    else if (buttonIndex == 3) {
+                        resetSimulation();
                     }
                 }
                 clock.restart();
@@ -294,6 +287,18 @@ private:
         visualizer.drawElements();
     }
 
+    void startSimulation() {
+        // TO add
+    }
+
+    void stopSimulation() {
+        // To add
+    }
+
+    void resetSimulation() {
+        // To add
+    }
+
     void update() {
         // Update the simulation and visualizer based on the current game state
         switch (state) {
@@ -308,10 +313,7 @@ private:
                 // Possibly handle post-simulation logic
                 break;
         }
-        visualizer.update(); // Update the visualization based on the new simulation state
     }
-
-    // Other methods as needed for game logic
 };
 
 int main() {

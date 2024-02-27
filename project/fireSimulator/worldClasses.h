@@ -7,6 +7,66 @@
 #include <cmath> // for std::max
 
 
+
+// Parameter class for changeable properties
+class Parameter {
+public:
+    virtual ~Parameter() = default;
+    virtual void Reset() = 0;
+};
+
+// Template class for specific types of parameters
+template<typename T>
+class TypedParameter : public Parameter {
+    T initialValue_;
+    T value_;
+    T minValue_;
+    T maxValue_;
+
+public:
+    TypedParameter(T initialValue, T minValue, T maxValue)
+            : initialValue_(initialValue), value_(initialValue), minValue_(minValue), maxValue_(maxValue) {}
+
+    void SetValue(T value) {
+        value_ = std::max(minValue_, std::min(maxValue_, value));
+    }
+
+    T GetValue() const {
+        return value_;
+    }
+
+    virtual void Reset() override {
+        value_ = initialValue_;
+    }
+};
+
+// Container for managing parameters
+class ParameterContainer {
+    std::unordered_map<std::string, std::shared_ptr<Parameter>> parameters_;
+
+public:
+    void AddParameter(const std::string& name, std::shared_ptr<Parameter> parameter) {
+        parameters_[name] = parameter;
+    }
+
+    template<typename T>
+    std::shared_ptr<TypedParameter<T>> GetParameter(const std::string& name) {
+        auto it = parameters_.find(name);
+        if (it != parameters_.end()) {
+            return std::dynamic_pointer_cast<TypedParameter<T>>(it->second);
+        }
+        return nullptr;
+    }
+
+    void ResetParameters() {
+        for (auto& [name, param] : parameters_) {
+            param->Reset();
+        }
+    }
+};
+
+
+
 enum class VegetationType {
     Grass,
     Sparse,
@@ -14,62 +74,8 @@ enum class VegetationType {
     Swamp
 };
 
-// Weather class
-class Weather {
-public:
-    Weather(int windDirection, float windSpeed)
-            : windDirection_(windDirection), windSpeed_(windSpeed) {}
-
-    void Reset() {
-        // Create a random number generator
-        std::random_device rd;  // Will be used to obtain a seed for the random number engine
-        std::mt19937 gen(rd()); // Standard mersenne_twister_engine
-
-        // Create distribution for wind direction (0 to 359)
-        std::uniform_int_distribution<> disDir(0, 359);
-        windDirection_ = disDir(gen);
-
-        // Create distribution for wind speed (0.0 to 15.0)
-        std::uniform_real_distribution<> disSpeed(0.0, 15.0);
-        windSpeed_ = disSpeed(gen);
-    }
-
-    int GetWindDirection() const { return windDirection_; }
-    float GetWindSpeed() const { return windSpeed_; }
-
-    void ChangeWindDirection(int newDirection) {
-        // Ensure the wind direction stays within 0-359 degrees
-        windDirection_ = ((newDirection % 360) + 360) % 360;
-    }
-
-    void ChangeWindSpeed(float newSpeed) {
-        // Ensure the wind speed is within a reasonable range
-        windSpeed_ = std::max(0.0f, std::min(100.0f, newSpeed));
-    }
-
-    void Update() {
-        std::random_device rd;
-        std::mt19937 gen(rd());
-
-        // Randomly change the wind direction by +/- 15 degrees
-        std::uniform_int_distribution<> disDirChange(-15, 15);
-        int windDirectionChange = disDirChange(gen);
-        ChangeWindDirection(windDirection_ + windDirectionChange);
-
-        // Randomly change the wind strength by +/- 4 km/h
-        std::uniform_real_distribution<> disSpeedChange(-4.0, 4.0);
-        float windSpeedChange = disSpeedChange(gen);
-        ChangeWindSpeed(windSpeed_ + windSpeedChange);
-    }
-
-
-private:
-    int windDirection_; // in degrees
-    float windSpeed_; // in km/h
-};
-
 // Tile class
-class Tile {
+class Tile : public ParameterContainer {
 public:
     Tile(float height, int moisture, VegetationType vegetation, int positionX, int positionY)
             : height_(height), moisture_(moisture), vegetation_(vegetation),
@@ -103,18 +109,19 @@ private:
 };
 
 // World-class
-class World {
+class World : public ParameterContainer {
 public:
-    World(int width, int depth) : width_(std::max(0, width)), depth_(std::max(0, depth)), weather_(0, 0) {
-        grid_.resize(width_);
+    std::vector<std::vector<Tile*>> grid; // 2D grid of Tile pointers
+
+    World(int width, int depth) : width_(std::max(0, width)), depth_(std::max(0, depth)) {
+        grid.resize(width_);
         for (int i = 0; i < width_; ++i) {
-            grid_[i].resize(depth_, nullptr); // Initialize with nullptrs or actual Tile objects
+            grid[i].resize(depth_, nullptr); // Initialize with nullptrs or actual Tile objects
         }
     }
 
     void Reset() {
-        weather_.Reset();
-        for (auto& row : grid_) {
+        for (auto& row : grid) {
             for (auto& tile : row) {
                 if (tile) tile->Reset();
             }
@@ -131,15 +138,15 @@ public:
         if (x < 0 || x >= width_ || y < 0 || y >= depth_) {
             throw std::out_of_range("Coordinates are out of the grid bounds.");
         }
-        return grid_[x][y];
+        return grid[x][y];
     }
 
     void SetTileAt(int x, int y, Tile* tile) {
         if (x < 0 || x >= width_ || y < 0 || y >= depth_) {
             throw std::out_of_range("Coordinates are out of the grid bounds.");
         }
-        delete grid_[x][y]; // Clean up the existing tile if necessary
-        grid_[x][y] = tile; // Place the new tile
+        delete grid[x][y]; // Clean up the existing tile if necessary
+        grid[x][y] = tile; // Place the new tile
     }
 
     std::vector<Tile*> GetNeighborTiles(Tile* tile, int distance = 1) {
@@ -172,10 +179,6 @@ public:
         return edgeNeighbors;
     }
 
-    void UpdateWeather() {
-        weather_.Update();
-    }
-
     int TilesOnSide() {
         if (width_ != depth_) {
             throw std::runtime_error("There could be a problem, sizes of sides are not the same");
@@ -185,6 +188,4 @@ public:
 
 private:
     int width_, depth_;
-    std::vector<std::vector<Tile*>> grid_; // 2D grid of Tile pointers
-    Weather weather_;
 };
