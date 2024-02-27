@@ -98,6 +98,8 @@ void Visualizer::initializeButtons(int tileSize) {
     int margin = 50;
     int xPosition = world->TilesOnSide() * tileSize + margin;
 
+    buttons.clear(); // Clear existing buttons if re-initializing
+
     // Initialize buttons with updated positions
     sf::RectangleShape button(sf::Vector2f(100, 50));
     button.setPosition(xPosition, 100); // Positioned to the right of the tiles
@@ -223,23 +225,19 @@ void Visualizer::highlightTile(int index) {
 class MainLogic {
 private:
     std::shared_ptr<World> world; // World object to hold the simulation state
-    Map<float> terrainMap;
+    int worldSize = 20;
 
     //FireSpreadSimulation simulation; // The simulation logic TODO add to constructor in MainLogic
     Visualizer visualizer; // The visualizer for rendering
+
 
     enum class GameState {
         PreStart, Running, Stopped
     } state; // Game state
 
 public:
-    MainLogic(int worldWidthAndDepth) : world(nullptr), terrainMap(worldWidthAndDepth, worldWidthAndDepth),
-                                        visualizer(std::make_shared<World>(worldWidthAndDepth, worldWidthAndDepth)), state(GameState::PreStart) {
-
-        WorldGenerator worldGenerator(worldWidthAndDepth, worldWidthAndDepth, 0.15f, 3);
-        world = worldGenerator.Generate();
-        visualizer.setWorld(world);
-        visualizer.drawElements();
+    MainLogic() : world(nullptr), visualizer(std::make_shared<World>(worldSize, worldSize)), state(GameState::PreStart) {
+        generateNewWorld();
     }
 
     void run() {
@@ -274,6 +272,9 @@ private:
                 if (buttonIndex != -1) {
                     std::cout << "button " << buttonIndex << " clicked" << std::endl;
                     // Handle button click, for example, start or stop simulation
+                    if (buttonIndex == 0) {
+                        generateNewWorld();
+                    }
                 }
                 clock.restart();
             }
@@ -284,6 +285,13 @@ private:
                 clock.restart();
             }
         }
+    }
+
+    void generateNewWorld() {
+        WorldGenerator worldGenerator(worldSize, worldSize, 0.15f, 3);
+        world = worldGenerator.Generate();
+        visualizer.setWorld(world);
+        visualizer.drawElements();
     }
 
     void update() {
@@ -307,7 +315,7 @@ private:
 };
 
 int main() {
-    MainLogic logic(30); // Create the game logic with a 100x100 world
+    MainLogic logic; // Create the game logic with a 100x100 world
     logic.run(); // Run the game
     return 0;
 }
