@@ -49,7 +49,7 @@ class Visualizer {
 
     sf::Color tileDefaultColor = sf::Color::White; // Default tile color
     sf::Color tileHighlightColor = sf::Color::Yellow; // Highlighted tile color
-    sf::Color buttonDefaultColor = sf::Color::Green; // Default button color
+    sf::Color buttonDefaultColor = sf::Color::White; // Default button color
     sf::Color buttonHighlightColor = sf::Color::Red; // Highlighted button color
 
     std::shared_ptr<World> world;
@@ -82,8 +82,12 @@ public:
     sf::RenderWindow window;
 
     bool isWindowOpen() const;
-    bool handleEvents();
     void drawElements();
+
+    int checkButtonClick(sf::Vector2i mousePos, bool applyFeedback);
+
+    int getHoveredTileIndex(sf::Vector2i mousePos);
+    void highlightTile(int index);
 
     bool pollEvent(sf::Event &event);
     void update();
@@ -135,53 +139,6 @@ sf::Color Visualizer::getTileColor(int worldWidthPosition, int worldDepthPositio
     return grayScaleColor;
 }
 
-bool Visualizer::handleEvents() {
-    bool needRedraw = false;
-    sf::Event event;
-    sf::Vector2i mousePos = sf::Mouse::getPosition(window);
-
-    while (window.pollEvent(event)) {
-        if (event.type == sf::Event::Closed) {
-            window.close();
-        }
-
-        if (event.type == sf::Event::MouseButtonPressed) {
-            for (auto& btn : buttons) {
-                if (btn.getGlobalBounds().contains(mousePos.x, mousePos.y)) {
-                    btn.setFillColor(buttonHighlightColor);
-
-                    // TODO tell main logic about it - button functionality
-
-                    needRedraw = true;
-                }
-            }
-        }
-    }
-
-    // Change color on tile hover, only one can be hovered over at one time
-    int newHighlightedTileIndex = -1;
-    for (size_t i = 0; i < tiles.size(); ++i) {
-        if (tiles[i].getGlobalBounds().contains(mousePos.x, mousePos.y)) {
-            newHighlightedTileIndex = i;
-            break;
-        }
-    }
-
-    if (newHighlightedTileIndex != lastHighlightedTileIndex) {
-        if (lastHighlightedTileIndex != -1) {
-            sf::Color tileColor = getTileColor(lastHighlightedTileIndex / world->TilesOnSide() , lastHighlightedTileIndex % world->TilesOnSide());
-            tiles[lastHighlightedTileIndex].setFillColor(tileColor); // Revert color of previously highlighted tile
-        }
-        if (newHighlightedTileIndex != -1) {
-            tiles[newHighlightedTileIndex].setFillColor(tileHighlightColor); // Highlight new tile
-        }
-        lastHighlightedTileIndex = newHighlightedTileIndex;
-        needRedraw = true;
-    }
-
-    return needRedraw;
-}
-
 void Visualizer::drawElements() {
     window.clear();
 
@@ -200,16 +157,65 @@ bool Visualizer::isWindowOpen() const {
     return window.isOpen();
 }
 
-bool Visualizer::pollEvent(sf::Event& event) {
-    return window.pollEvent(event);
+// Check for button click and apply visual feedback directly
+int Visualizer::checkButtonClick(sf::Vector2i mousePos, bool applyFeedback = false) {
+    for (size_t i = 0; i < buttons.size(); ++i) {
+        if (buttons[i].getGlobalBounds().contains(static_cast<float>(mousePos.x), static_cast<float>(mousePos.y))) {
+            if (applyFeedback) {
+                // Change the button color to indicate it has been clicked
+                buttons[i].setFillColor(buttonHighlightColor);
+                drawElements(); // Redraw elements to show the feedback
+                sf::sleep(sf::milliseconds(50)); // Short delay for feedback visibility
+                buttons[i].setFillColor(buttonDefaultColor); // Revert the button color
+                drawElements(); // Redraw elements to show the feedback
+            }
+            return static_cast<int>(i); // Button was clicked, return its index
+        }
+    }
+    return -1; // No button was clicked
 }
 
-void Visualizer::update() {
-    // Combine existing draw and event handling logic
-    if (handleEvents()) {
+
+int Visualizer::getHoveredTileIndex(sf::Vector2i mousePos) {
+    for (size_t i = 0; i < tiles.size(); ++i) {
+        if (tiles[i].getGlobalBounds().contains(static_cast<float>(mousePos.x), static_cast<float>(mousePos.y))) {
+            return static_cast<int>(i); // Mouse is over this tile
+        }
+    }
+    return -1; // No tile is hovered
+}
+
+
+void Visualizer::highlightTile(int index) {
+    bool needRedraw = false;
+
+    // Unhighlight the previous tile if necessary
+    if (lastHighlightedTileIndex != -1 && lastHighlightedTileIndex != index) {
+        int previousRow = lastHighlightedTileIndex / world->TilesOnSide();
+        int previousCol = lastHighlightedTileIndex % world->TilesOnSide();
+        tiles[lastHighlightedTileIndex].setFillColor(getTileColor(previousRow, previousCol));
+        needRedraw = true;
+    }
+
+    // Highlight the new tile
+    if (index != -1) {
+        tiles[index].setFillColor(tileHighlightColor);
+        needRedraw = true;
+    } else if (lastHighlightedTileIndex != -1) {
+        // If there's no new tile to highlight (index == -1), reset the last highlighted tile
+        int lastRow = lastHighlightedTileIndex / world->TilesOnSide();
+        int lastCol = lastHighlightedTileIndex % world->TilesOnSide();
+        tiles[lastHighlightedTileIndex].setFillColor(getTileColor(lastRow, lastCol));
+        needRedraw = true;
+    }
+
+    if (needRedraw) {
         drawElements();
     }
+
+    lastHighlightedTileIndex = index; // Update the last highlighted tile index
 }
+
 
 
 
@@ -240,13 +246,11 @@ public:
         // Main loop to handle game state transitions and updates
         sf::Clock clock;
         while (visualizer.isWindowOpen()) {
-            if (visualizer.handleEvents()) {
-                visualizer.drawElements();
-                clock.restart();
-            }
+
+            handleInputEvents(clock); // Handle all input events
 
             if (!visualizer.window.hasFocus()) {
-                sf::sleep(sf::milliseconds(80)); // Sleep to reduce CPU usage
+                sf::sleep(sf::milliseconds(70)); // Sleep to reduce CPU usage
             }
 
             if (clock.getElapsedTime().asSeconds() > 1) { // If idle for more than a second, reduce the frequency of event polling
@@ -256,9 +260,30 @@ public:
     }
 
 private:
-    void handleInput() {
+    void handleInputEvents(sf::Clock& clock) {
         // Handle user input to change game state or interact with the world
-        // This could involve starting/stopping the simulation, setting tiles on fire, etc.
+        sf::Event event;
+        while (visualizer.window.pollEvent(event)) {
+
+            if (event.type == sf::Event::Closed) {
+                visualizer.window.close();
+            }
+            else if (event.type == sf::Event::MouseButtonPressed) {
+                auto mousePos = sf::Mouse::getPosition(visualizer.window);
+                int buttonIndex = visualizer.checkButtonClick(mousePos, true);
+                if (buttonIndex != -1) {
+                    std::cout << "button " << buttonIndex << " clicked" << std::endl;
+                    // Handle button click, for example, start or stop simulation
+                }
+                clock.restart();
+            }
+            else if (event.type == sf::Event::MouseMoved) {
+                auto mousePos = sf::Mouse::getPosition(visualizer.window);
+                int hoveredTileIndex = visualizer.getHoveredTileIndex(mousePos);
+                visualizer.highlightTile(hoveredTileIndex);
+                clock.restart();
+            }
+        }
     }
 
     void update() {
@@ -282,7 +307,7 @@ private:
 };
 
 int main() {
-    MainLogic logic(100); // Create the game logic with a 100x100 world
+    MainLogic logic(30); // Create the game logic with a 100x100 world
     logic.run(); // Run the game
     return 0;
 }
