@@ -7,6 +7,7 @@ class Visualizer {
 
     std::vector<sf::RectangleShape> tiles;
 
+    std::vector<bool> permanentlyHighlightedTiles;
     int lastHighlightedTileIndex = -1;
 
     const int MARGIN_FOR_TILES = 2;
@@ -52,6 +53,7 @@ public:
     int checkButtonClick(sf::Vector2i mousePos, bool applyFeedback);
     int getHoveredTileIndex(sf::Vector2i mousePos);
     void highlightTile(int index);
+    void permanentlyHighlightTile(int index);
 };
 
 void Visualizer::initializeButtons(int tileSize) {
@@ -100,6 +102,8 @@ void Visualizer::initializeTiles(int windowHeight) {
             tiles.push_back(tile);
         }
     }
+
+    permanentlyHighlightedTiles.resize(tiles.size(), false); // Initialize all tiles as not permanently highlighted
 }
 
 void Visualizer::loadFont() {
@@ -165,8 +169,8 @@ int Visualizer::getHoveredTileIndex(sf::Vector2i mousePos) {
 void Visualizer::highlightTile(int index) {
     bool needRedraw = false;
 
-    // Unhighlight the previous tile if necessary
-    if (lastHighlightedTileIndex != -1 && lastHighlightedTileIndex != index) {
+    // Unhighlight the previous tile if necessary and it's not permanently highlighted
+    if (lastHighlightedTileIndex != -1 && lastHighlightedTileIndex != index && !permanentlyHighlightedTiles[lastHighlightedTileIndex]) {
         int previousRow = lastHighlightedTileIndex / world->TilesOnSide();
         int previousCol = lastHighlightedTileIndex % world->TilesOnSide();
         tiles[lastHighlightedTileIndex].setFillColor(getTileColor(previousRow, previousCol));
@@ -174,14 +178,8 @@ void Visualizer::highlightTile(int index) {
     }
 
     // Highlight the new tile
-    if (index != -1) {
+    if (index != -1 && !permanentlyHighlightedTiles[index]) {
         tiles[index].setFillColor(tileHighlightColor);
-        needRedraw = true;
-    } else if (lastHighlightedTileIndex != -1) {
-        // If there's no new tile to highlight (index == -1), reset the last highlighted tile
-        int lastRow = lastHighlightedTileIndex / world->TilesOnSide();
-        int lastCol = lastHighlightedTileIndex % world->TilesOnSide();
-        tiles[lastHighlightedTileIndex].setFillColor(getTileColor(lastRow, lastCol));
         needRedraw = true;
     }
 
@@ -190,4 +188,12 @@ void Visualizer::highlightTile(int index) {
     }
 
     lastHighlightedTileIndex = index; // Update the last highlighted tile index
+}
+
+void Visualizer::permanentlyHighlightTile(int index) {
+    if (index != -1) {
+        permanentlyHighlightedTiles[index] = !permanentlyHighlightedTiles[index]; // Toggle the permanent highlight state
+        tiles[index].setFillColor(permanentlyHighlightedTiles[index] ? tileHighlightColor : getTileColor(index / world->TilesOnSide(), index % world->TilesOnSide()));
+        drawElements();
+    }
 }
