@@ -8,8 +8,10 @@ set(SFML_DIR "/opt/homebrew/Cellar/sfml/2.6.1/lib/cmake/SFML")
 set(SOURCE_FILES
     main.cpp
     worldClasses.h
-        worldGenerator.h
-        perlin.h
+    worldGenerator.h
+    perlin.h
+    simulation.h
+        visualizer.h
 )
 
 # Find SFML

@@ -148,6 +148,9 @@ private:
             updateClock.restart(); // Restart the clock when the simulation starts or continues
             std::cout << "Simulation running" << std::endl;
         }
+
+        world->ResetParameters();
+
     }
 
     void stopSimulation() {
