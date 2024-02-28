@@ -54,6 +54,7 @@ public:
     int getHoveredTileIndex(sf::Vector2i mousePos);
     void highlightTile(int index);
     void permanentlyHighlightTile(int index);
+    void resetPermanentlyHighlightedTiles();
 };
 
 void Visualizer::initializeButtons(int tileSize) {
@@ -196,4 +197,22 @@ void Visualizer::permanentlyHighlightTile(int index) {
         tiles[index].setFillColor(permanentlyHighlightedTiles[index] ? tileHighlightColor : getTileColor(index / world->TilesOnSide(), index % world->TilesOnSide()));
         drawElements();
     }
+}
+
+void Visualizer::resetPermanentlyHighlightedTiles() {
+    // Iterate through all tiles and reset their highlight status
+    for (size_t i = 0; i < permanentlyHighlightedTiles.size(); ++i) {
+        if (permanentlyHighlightedTiles[i]) { // Check if the tile is permanently highlighted
+            // Reset the highlight status
+            permanentlyHighlightedTiles[i] = false;
+
+            // Reset the tile color to its original state based on the world's terrain
+            int row = i / world->TilesOnSide();
+            int col = i % world->TilesOnSide();
+            tiles[i].setFillColor(getTileColor(row, col));
+        }
+    }
+
+    // Redraw elements to reflect the changes
+    drawElements();
 }

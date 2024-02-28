@@ -22,6 +22,9 @@ private:
 
     bool isMouseButtonPressed = false;
 
+    sf::Clock updateClock; // Clock to track time since last simulation update
+    float updateInterval = 1.0f; // Interval in seconds between simulation updates
+
     enum class GameState {
         NewWorld, Running, Stopped
     } state; // Game state
@@ -121,25 +124,30 @@ private:
     }
 
     void generateNewWorld() {
-        resetSimulation();
-
         WorldGenerator worldGenerator(worldSize, worldSize, 0.15f, 3);
         world = worldGenerator.Generate();
         visualizer.setWorld(world);
         visualizer.drawElements();
+
+        resetSimulation();
     }
 
     void startSimulation() {
-        if (initBurningTiles.empty()) {
+        if (initBurningTiles.empty() && state == GameState::NewWorld) {
             std::cout << "Ignite some tiles first!" << std::endl;
             return;
         }
-        if (!fireSpreadSimulation) {
-            fireSpreadSimulation = std::make_unique<FireSpreadSimulation>(*world);
-            fireSpreadSimulation->Initialize(initBurningTiles);
+        // If simulation is already running or paused, this acts as a continue
+        if (state == GameState::Stopped || state == GameState::NewWorld) {
+            if (state == GameState::NewWorld) {
+                // Only initialize the simulation if it's in the NewWorld state
+                fireSpreadSimulation = std::make_unique<FireSpreadSimulation>(*world);
+                fireSpreadSimulation->Initialize(initBurningTiles);
+            }
+            state = GameState::Running;
+            updateClock.restart(); // Restart the clock when the simulation starts or continues
+            std::cout << "Simulation running" << std::endl;
         }
-        state = GameState::Running;
-        std::cout << "Simulation running" << std::endl;
     }
 
     void stopSimulation() {
@@ -150,23 +158,28 @@ private:
         state = GameState::NewWorld;
         initBurningTiles.clear();
 
-        // TODO reset permanently highlighted tiles
-        // + reset simulation itself
-        // + world parameters
+        if (fireSpreadSimulation) {
+            fireSpreadSimulation->Reset(); // TODO should also reset world parameters
+        }
+
+        visualizer.resetPermanentlyHighlightedTiles();
     }
 
     void update() {
-        // Update the simulation and visualizer based on the current game state
         switch (state) {
             case GameState::NewWorld:
-                // Allow user to modify the world (e.g., set tiles on fire)
+                // Interaction with the world allowed, but no simulation updates
                 break;
             case GameState::Running:
-                //simulation.update(); // Update the simulation state
-                // Pass updated world state to visualizer here
+                if (fireSpreadSimulation && updateClock.getElapsedTime().asSeconds() > updateInterval) {
+                    fireSpreadSimulation->Update();
+                    auto changedTiles = fireSpreadSimulation->GetChangedTiles();
+                    // Update the visualizer with changedTiles
+                    updateClock.restart(); // Restart the clock after an update
+                }
                 break;
             case GameState::Stopped:
-                // Possibly handle post-simulation logic
+                // Simulation is paused, no updates
                 break;
         }
     }
