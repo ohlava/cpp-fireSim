@@ -114,6 +114,10 @@ public:
     }
 
     void Reset() {
+        currentTime_ = 0;
+        changesOverTime_.clear();
+        burningTiles_.clear();
+
         // Reset world and tiles to their initial state
         world_.ResetParameters(); // Resets global parameters like wind
         for (auto& row : world_.grid) {

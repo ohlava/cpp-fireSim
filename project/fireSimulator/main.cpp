@@ -79,8 +79,10 @@ private:
             }
             else if (event.type == sf::Event::MouseMoved) {
                 auto mousePos = sf::Mouse::getPosition(visualizer.window);
-                int hoveredTileIndex = visualizer.getHoveredTileIndex(mousePos);
-                visualizer.highlightTile(hoveredTileIndex);
+                auto [x, y] = visualizer.getHoveredTileCoords(mousePos);
+                if (x != -1 && y != -1) { // Valid tile
+                    visualizer.highlightTile(x , y);
+                }
                 clock.restart();
             }
         }
@@ -88,15 +90,15 @@ private:
 
     void handleTileInteraction(const sf::Vector2i& mousePos) {
         if (state == GameState::NewWorld) { // Only allow tile interaction in NewWorld state
-            int clickedTileIndex = visualizer.getHoveredTileIndex(mousePos);
-            if (clickedTileIndex != -1) {
-                Tile* clickedTile = world->GetTileAt(clickedTileIndex / worldSize, clickedTileIndex % worldSize);
+            auto [x, y] = visualizer.getHoveredTileCoords(mousePos);
+            if (x != -1 && y != -1) { // Valid tile
+                Tile* clickedTile = world->GetTileAt(x, y);
                 if (std::find(initBurningTiles.begin(), initBurningTiles.end(), clickedTile) == initBurningTiles.end()) {
                     initBurningTiles.push_back(clickedTile);
-                    visualizer.permanentlyHighlightTile(clickedTileIndex);
+                    visualizer.permanentlyHighlightTile(x, y);
                 } else {
                     initBurningTiles.erase(std::remove(initBurningTiles.begin(), initBurningTiles.end(), clickedTile), initBurningTiles.end());
-                    visualizer.permanentlyHighlightTile(clickedTileIndex);
+                    visualizer.permanentlyHighlightTile(x, y);
                 }
             }
         }
@@ -137,7 +139,7 @@ private:
             std::cout << "Ignite some tiles first!" << std::endl;
             return;
         }
-        // If simulation is already running or paused, this acts as a continue
+        // If simulation is already running or paused, this acts as continue with simulation
         if (state == GameState::Stopped || state == GameState::NewWorld) {
             if (state == GameState::NewWorld) {
                 // Only initialize the simulation if it's in the NewWorld state
@@ -148,8 +150,6 @@ private:
             updateClock.restart(); // Restart the clock when the simulation starts or continues
             std::cout << "Simulation running" << std::endl;
         }
-
-        // world->ResetParameters();
     }
 
     void stopSimulation() {
@@ -163,6 +163,7 @@ private:
         if (fireSpreadSimulation) {
             fireSpreadSimulation->Reset(); // TODO should also reset world parameters
         }
+        // world->ResetParameters();
 
         visualizer.Reset();
     }
