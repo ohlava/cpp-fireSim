@@ -11,7 +11,7 @@ set(SOURCE_FILES
     worldGenerator.h
     perlin.h
     simulation.h
-        visualizer.h
+    visualizer.h
 )
 
 # Find SFML

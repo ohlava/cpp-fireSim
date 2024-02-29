@@ -52,8 +52,8 @@ public:
             for (auto& tile : row) {
                 if (tile != nullptr) { // Ensure the tile exists
                     tile->AddParameter("isBurning", std::make_shared<TypedParameter<bool>>(false, false, true));
-                    tile->AddParameter("HasBurned", std::make_shared<TypedParameter<bool>>(false, false, true));
-                    tile->AddParameter("burnTime", std::make_shared<TypedParameter<int>>(0, 0, 5));
+                    tile->AddParameter("hasBurned", std::make_shared<TypedParameter<bool>>(false, false, true));
+                    tile->AddParameter("burnTime", std::make_shared<TypedParameter<int>>(1, 0, 5));
                     tile->AddParameter("burningFor", std::make_shared<TypedParameter<int>>(0, 0, 5));
                 }
             }
@@ -68,7 +68,9 @@ public:
         for (auto* tile : burningTiles_) {
             auto neighbors = world_.GetNeighborTiles(tile); // This function needs to be defined or adapted.
             for (auto* neighbor : neighbors) {
-                if (!neighbor->GetParameter<bool>("isBurning")->GetValue() && TryIgniteTile(tile, neighbor)) {
+                if (!neighbor->GetParameter<bool>("isBurning")->GetValue() && !neighbor->GetParameter<bool>("hasBurned")->GetValue()
+                        && TryIgniteTile(tile, neighbor)) {
+                    // Neighbor tile catching on fire
                     nextBurningTiles.push_back(neighbor);
                     neighbor->GetParameter<bool>("isBurning")->SetValue(true);
                     changesOverTime_[currentTime_].push_back(neighbor);
@@ -79,6 +81,7 @@ public:
             auto burningFor = tile->GetParameter<int>("burningFor")->GetValue() + 1;
             if (burningFor >= tile->GetParameter<int>("burnTime")->GetValue()) {
                 tile->GetParameter<bool>("isBurning")->SetValue(false);
+                tile->GetParameter<bool>("hasBurned")->SetValue(true);
                 changesOverTime_[currentTime_].push_back(tile);
             } else {
                 tile->GetParameter<int>("burningFor")->SetValue(burningFor);
@@ -137,7 +140,7 @@ public:
 
         // Verify tile parameters
         for (const auto& tile : tiles) {
-            if (!tile->GetParameter<bool>("HasBurned") || !tile->GetParameter<int>("burnTime") ||
+            if (!tile->GetParameter<bool>("hasBurned") || !tile->GetParameter<int>("burnTime") ||
                 !tile->GetParameter<int>("burningFor") || !tile->GetParameter<bool>("isBurning")) {
                 std::cerr << "One or more tiles are missing required fire parameters." << std::endl;
                 return false;

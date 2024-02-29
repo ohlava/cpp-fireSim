@@ -5,6 +5,7 @@
 #include <cstdlib> // For rand()
 #include <ctime> // For time()
 
+// Just to sample Perlin Noise
 // from Perlin C++ Tutorial
 // https://pastebin.com/gXEYsmw8
 
