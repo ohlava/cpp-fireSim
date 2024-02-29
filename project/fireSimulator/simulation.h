@@ -53,8 +53,8 @@ public:
                 if (tile != nullptr) { // Ensure the tile exists
                     tile->AddParameter("isBurning", std::make_shared<TypedParameter<bool>>(false, false, true));
                     tile->AddParameter("HasBurned", std::make_shared<TypedParameter<bool>>(false, false, true));
-                    tile->AddParameter("burnTime", std::make_shared<TypedParameter<int>>(0, 0, 100)); // Example range
-                    tile->AddParameter("burningFor", std::make_shared<TypedParameter<int>>(0, 0, 100)); // Example range
+                    tile->AddParameter("burnTime", std::make_shared<TypedParameter<int>>(0, 0, 5));
+                    tile->AddParameter("burningFor", std::make_shared<TypedParameter<int>>(0, 0, 5));
                 }
             }
         }

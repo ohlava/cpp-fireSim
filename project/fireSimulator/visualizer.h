@@ -188,8 +188,10 @@ std::pair<int, int> Visualizer::getHoveredTileCoords(sf::Vector2i mousePos) {
 
 
 void Visualizer::highlightTile(int row, int col) {
-    int index = row * world->TilesOnSide() + col; // TODO index problem
     bool needRedraw = false;
+
+
+
 
     // Unhighlight the previous tile if necessary and it's not permanently highlighted
     if (lastHighlightedTileCoords.first != -1 && lastHighlightedTileCoords.second != -1 &&
@@ -200,7 +202,7 @@ void Visualizer::highlightTile(int row, int col) {
     }
 
     // Highlight the new tile
-    if (!permanentlyHighlightedTiles[row][col]) {
+    if (row != -1 && col != -1 && !permanentlyHighlightedTiles[row][col]) {
         tiles[row][col].setFillColor(tileHighlightColor);
         needRedraw = true;
     }

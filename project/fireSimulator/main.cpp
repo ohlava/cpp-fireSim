@@ -80,9 +80,7 @@ private:
             else if (event.type == sf::Event::MouseMoved) {
                 auto mousePos = sf::Mouse::getPosition(visualizer.window);
                 auto [x, y] = visualizer.getHoveredTileCoords(mousePos);
-                if (x != -1 && y != -1) { // Valid tile
-                    visualizer.highlightTile(x , y);
-                }
+                visualizer.highlightTile(x , y);
                 clock.restart();
             }
         }
@@ -107,18 +105,21 @@ private:
     void handleButtonInteraction(const sf::Vector2i& mousePos) {
         int buttonIndex = visualizer.checkButtonClick(mousePos, true);
         if (buttonIndex != -1) {
-            std::cout << "Button " << buttonIndex << " clicked" << std::endl;
             switch (buttonIndex) {
                 case 0:
+                    std::cout << "Clicked on NewWorld" << std::endl;
                     generateNewWorld();
                     break;
                 case 1:
+                    std::cout << "Clicked on start simulation" << std::endl;
                     startSimulation();
                     break;
                 case 2:
+                    std::cout << "Clicked on stop simulation" << std::endl;
                     stopSimulation();
                     break;
                 case 3:
+                    std::cout << "Clicked on reset simulation" << std::endl;
                     resetSimulation();
                     break;
             }
@@ -161,9 +162,8 @@ private:
         initBurningTiles.clear();
 
         if (fireSpreadSimulation) {
-            fireSpreadSimulation->Reset(); // TODO should also reset world parameters
+            fireSpreadSimulation->Reset();
         }
-        // world->ResetParameters();
 
         visualizer.Reset();
     }
