@@ -149,12 +149,11 @@ private:
             std::cout << "Simulation running" << std::endl;
         }
 
-        world->ResetParameters();
-
+        // world->ResetParameters();
     }
 
     void stopSimulation() {
-        // To add
+        state = GameState::Stopped;
     }
 
     void resetSimulation() {
@@ -165,7 +164,7 @@ private:
             fireSpreadSimulation->Reset(); // TODO should also reset world parameters
         }
 
-        visualizer.resetPermanentlyHighlightedTiles();
+        visualizer.Reset();
     }
 
     void update() {
@@ -176,8 +175,9 @@ private:
             case GameState::Running:
                 if (fireSpreadSimulation && updateClock.getElapsedTime().asSeconds() > updateInterval) {
                     fireSpreadSimulation->Update();
-                    auto changedTiles = fireSpreadSimulation->GetChangedTiles();
-                    // Update the visualizer with changedTiles
+                    auto changedTiles = fireSpreadSimulation->GetChangedTileColors();
+                    visualizer.updateTileColors(changedTiles);
+                    visualizer.drawElements();
                     updateClock.restart(); // Restart the clock after an update
                 }
                 break;

@@ -20,6 +20,8 @@ class FireSpreadSimulation : public Simulation {
     std::unordered_map<int, std::vector<Tile*>> changesOverTime_; // Tracks changed tiles at each time step
     int currentTime_;
 
+    std::vector<Tile*> burningTiles_;
+
 public:
     FireSpreadSimulation(World& world) : world_(world), currentTime_(0) {
         InitWorldParameters();
@@ -28,12 +30,14 @@ public:
     void Initialize(std::vector<Tile*>& startingTiles) override {
         currentTime_ = 0;
         changesOverTime_.clear();
+        burningTiles_.clear();
 
         for (auto& tile : startingTiles) {
             auto isBurning = tile->GetParameter<bool>("isBurning");
             if (isBurning) { // checks if the isBurning parameter exists for the tile
                 isBurning->SetValue(true); // Explicitly set starting tiles as burning
                 changesOverTime_[currentTime_].push_back(tile);
+                burningTiles_.push_back(tile);
             }
         }
     }
@@ -57,16 +61,32 @@ public:
     }
 
     void Update() override {
-        std::vector<Tile*> currentChangedTiles;
-        // Simulation logic here: Check each tile, update status, track changes
 
-        // Iterate over all tiles, update their states based on the simulation logic
+        currentTime_++; // Advance simulation time
 
+        std::vector<Tile*> nextBurningTiles;
+        for (auto* tile : burningTiles_) {
+            auto neighbors = world_.GetNeighborTiles(tile); // This function needs to be defined or adapted.
+            for (auto* neighbor : neighbors) {
+                if (!neighbor->GetParameter<bool>("isBurning")->GetValue() && TryIgniteTile(tile, neighbor)) {
+                    nextBurningTiles.push_back(neighbor);
+                    neighbor->GetParameter<bool>("isBurning")->SetValue(true);
+                    changesOverTime_[currentTime_].push_back(neighbor);
+                }
+            }
 
-        if (!currentChangedTiles.empty()) {
-            currentTime_++;
-            changesOverTime_[currentTime_] = currentChangedTiles;
+            // Update burning duration
+            auto burningFor = tile->GetParameter<int>("burningFor")->GetValue() + 1;
+            if (burningFor >= tile->GetParameter<int>("burnTime")->GetValue()) {
+                tile->GetParameter<bool>("isBurning")->SetValue(false);
+                changesOverTime_[currentTime_].push_back(tile);
+            } else {
+                tile->GetParameter<int>("burningFor")->SetValue(burningFor);
+                nextBurningTiles.push_back(tile);
+            }
         }
+
+        burningTiles_ = std::move(nextBurningTiles); // Update the list of burning tiles for the next cycle
     }
 
     std::vector<Tile*> GetChangedTiles() const override {
@@ -77,16 +97,20 @@ public:
         return std::vector<Tile*>();
     }
 
-    bool HasEnded() const {
-        for (const auto& [time, tiles] : changesOverTime_) {
-            for (const auto& tile : tiles) {
-                auto isBurning = tile->GetParameter<bool>("isBurning");
-                if (isBurning && isBurning->GetValue()) {
-                    return false; // Simulation continues if any tile is still burning
-                }
-            }
+
+    std::unordered_map<int, sf::Color> GetChangedTileColors() const {
+        std::unordered_map<int, sf::Color> tileColors;
+        for (const auto& tile : GetChangedTiles()) {
+            // Determine color based on tile properties
+            sf::Color color = tile->GetParameter<bool>("isBurning")->GetValue()? sf::Color(255, 105, 105) : sf::Color(180, 50, 50);
+            int tileIndex = tile->GetWidthPosition() * world_.TilesOnSide() + tile->GetDepthPosition();// Logic to get tile's index in the visualizer
+            tileColors[tileIndex] = color;
         }
-        return true; // No tiles are burning, simulation ends
+        return tileColors;
+    }
+
+    bool HasEnded() const {
+        return burningTiles_.empty();
     }
 
     void Reset() {
@@ -96,11 +120,11 @@ public:
             for (auto& tile : row) {
                 tile->ResetParameters(); // Resets each tile's parameters
             }
-        }VerifyRequiredParameters
+        }
     }
 
     // Implementation of required parameters verification
-    virtual bool (World& world, const std::vector<Tile*>& tiles) const override {
+    virtual bool VerifyRequiredParameters(World& world, const std::vector<Tile*>& tiles) const override {
         // Verify world parameters
         if (!world.GetParameter<float>("windSpeed") || !world.GetParameter<int>("windDirection")) {
             std::cerr << "World is missing required wind parameters." << std::endl;
@@ -118,4 +142,23 @@ public:
 
         return true; // All required parameters are present
     }
+
+
+    bool TryIgniteTile(Tile* source, Tile* target) {
+        float spreadProbability = CalculateFireSpreadProbability(source, target);
+        // Simulate a random chance, assuming RandomChance() returns a float between 0.0f and 1.0f
+        return RandomChance() < spreadProbability;
+    }
+
+    float CalculateFireSpreadProbability(Tile* source, Tile* target) {
+        // Adapt your C# CalculateFireSpreadProbability logic here, including vegetation, moisture, wind, and slope calculations
+        // Example:
+        return 0.5f; // Placeholder probability
+    }
+
+    float RandomChance() {
+        // Placeholder for random chance generation, replace with actual random generation
+        return 0.4f; // Example fixed value, use std::uniform_real_distribution for actual randomness
+    }
+
 };

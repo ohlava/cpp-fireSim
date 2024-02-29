@@ -10,6 +10,8 @@ class Visualizer {
     std::vector<bool> permanentlyHighlightedTiles;
     int lastHighlightedTileIndex = -1;
 
+    std::unordered_map<int, sf::Color> customTileColors;
+
     const int MARGIN_FOR_TILES = 2;
 
     sf::Color tileDefaultColor = sf::Color::White; // Default tile color
@@ -22,16 +24,34 @@ class Visualizer {
     void loadFont();
     void initializeButtons(int tileSize);
     void initializeTiles(int windowHeight);
+    void resetPermanentlyHighlightedTiles();
     sf::Color getTileColor(int worldWidthPosition, int worldDepthPosition);
 
 public:
     Visualizer(std::shared_ptr<World> world) : window(sf::VideoMode(800, 600), "Simulation", sf::Style::Titlebar | sf::Style::Close), world(world) {
     }
 
+    void Reset() {
+        lastHighlightedTileIndex = -1;
+        customTileColors.clear();
+        resetPermanentlyHighlightedTiles();
+        initializeTiles(window.getSize().y);
+
+        drawElements();  // Redraw elements to reflect the changes
+    }
+
     void setWorld(std::shared_ptr<World> worldToSet) {
         world = std::move(worldToSet);
         initializeButtons(window.getSize().y / world->TilesOnSide());
         initializeTiles(window.getSize().y); // Re-initialize tiles with terrain map
+    }
+
+    // Method to update tile colors based on simulation output
+    void updateTileColors(const std::unordered_map<int, sf::Color>& updatedColors) {
+        for (const auto& [tileIndex, color] : updatedColors) {
+            customTileColors[tileIndex] = color;
+        }
+        initializeTiles(window.getSize().y);
     }
 
     // Methods to change colors dynamically if needed
@@ -54,7 +74,7 @@ public:
     int getHoveredTileIndex(sf::Vector2i mousePos);
     void highlightTile(int index);
     void permanentlyHighlightTile(int index);
-    void resetPermanentlyHighlightedTiles();
+
 };
 
 void Visualizer::initializeButtons(int tileSize) {
@@ -114,6 +134,15 @@ void Visualizer::loadFont() {
 }
 
 sf::Color Visualizer::getTileColor(int worldWidthPosition, int worldDepthPosition) {
+    int tileIndex = worldWidthPosition * world->TilesOnSide() + worldDepthPosition;
+
+    // Check if there's a custom color for this tile
+    auto it = customTileColors.find(tileIndex);
+    if (it != customTileColors.end()) {
+        // If a custom color is found, return it
+        return it->second;
+    }
+
     float terrainValue = world->GetTileAt(worldWidthPosition, worldDepthPosition)->GetHeight(); // Use terrain value for color
     sf::Color grayScaleColor = sf::Color(terrainValue * 255, terrainValue * 255, terrainValue * 255);
     return grayScaleColor;
@@ -212,7 +241,4 @@ void Visualizer::resetPermanentlyHighlightedTiles() {
             tiles[i].setFillColor(getTileColor(row, col));
         }
     }
-
-    // Redraw elements to reflect the changes
-    drawElements();
 }
