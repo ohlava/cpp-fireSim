@@ -30,7 +30,7 @@ private:
     } state; // Game state
 
 public:
-    MainLogic() : world(nullptr), visualizer(std::make_shared<World>(worldSize, worldSize)), state(GameState::NewWorld) {
+    MainLogic() : world(nullptr), visualizer(std::make_shared<World>(worldSize, worldSize), 800, 600), state(GameState::NewWorld) {
         generateNewWorld();
     }
 
@@ -127,7 +127,7 @@ private:
         WorldGenerator worldGenerator(worldSize, worldSize, 0.15f, 3);
         world = worldGenerator.Generate();
         visualizer.setWorld(world);
-        visualizer.drawElements();
+        visualizer.redrawElements();
 
         resetSimulation();
     }
@@ -176,8 +176,8 @@ private:
                 if (fireSpreadSimulation && updateClock.getElapsedTime().asSeconds() > updateInterval) {
                     fireSpreadSimulation->Update();
                     auto changedTiles = fireSpreadSimulation->GetChangedTileColors();
-                    visualizer.updateTileColors(changedTiles);
-                    visualizer.drawElements();
+                    visualizer.updateSimulationTileColors(changedTiles);
+                    visualizer.redrawElements();
                     updateClock.restart(); // Restart the clock after an update
                 }
                 break;

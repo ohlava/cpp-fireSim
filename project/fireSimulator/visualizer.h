@@ -1,16 +1,18 @@
 #pragma once
 
 class Visualizer {
+    int windowWidth;
+    int windowHeight;
+
     std::vector<sf::RectangleShape> buttons;
-    std::vector<sf::Text> buttonLabels; // labels for buttons
-    sf::Font font;
+    std::vector<sf::Text> buttonLabels; // Labels for buttons
+    sf::Font font; // For buttons text
 
     std::vector<sf::RectangleShape> tiles;
 
     std::vector<bool> permanentlyHighlightedTiles;
     int lastHighlightedTileIndex = -1;
-
-    std::unordered_map<int, sf::Color> customTileColors;
+    std::unordered_map<int, sf::Color> simulationTileColors;
 
     const int MARGIN_FOR_TILES = 2;
 
@@ -22,64 +24,49 @@ class Visualizer {
     std::shared_ptr<World> world;
 
     void loadFont();
-    void initializeButtons(int tileSize);
-    void initializeTiles(int windowHeight);
+    void initializeButtons();
+    void initializeTiles();
     void resetPermanentlyHighlightedTiles();
     sf::Color getTileColor(int worldWidthPosition, int worldDepthPosition);
 
 public:
-    Visualizer(std::shared_ptr<World> world) : window(sf::VideoMode(800, 600), "Simulation", sf::Style::Titlebar | sf::Style::Close), world(world) {
+    Visualizer(std::shared_ptr<World> world, int width, int height) : window(sf::VideoMode(width, height), "Simulation", sf::Style::Titlebar | sf::Style::Close), world(world), windowWidth(width), windowHeight(height) {
+        loadFont();
     }
 
     void Reset() {
         lastHighlightedTileIndex = -1;
-        customTileColors.clear();
+        simulationTileColors.clear();
         resetPermanentlyHighlightedTiles();
-        initializeTiles(window.getSize().y);
+        initializeTiles();
 
-        drawElements();  // Redraw elements to reflect the changes
+        redrawElements();  // Redraw elements to reflect the changes
     }
 
     void setWorld(std::shared_ptr<World> worldToSet) {
         world = std::move(worldToSet);
-        initializeButtons(window.getSize().y / world->TilesOnSide());
-        initializeTiles(window.getSize().y); // Re-initialize tiles with terrain map
-    }
-
-    // Method to update tile colors based on simulation output
-    void updateTileColors(const std::unordered_map<int, sf::Color>& updatedColors) {
-        for (const auto& [tileIndex, color] : updatedColors) {
-            customTileColors[tileIndex] = color;
-        }
-        initializeTiles(window.getSize().y);
-    }
-
-    // Methods to change colors dynamically if needed
-    void setTileColors(sf::Color defaultColor, sf::Color highlightColor) {
-        tileDefaultColor = defaultColor;
-        tileHighlightColor = highlightColor;
-    }
-
-    void setButtonColors(sf::Color defaultColor, sf::Color highlightColor) {
-        buttonDefaultColor = defaultColor;
-        buttonHighlightColor = highlightColor;
+        initializeButtons();
+        initializeTiles(); // Re-initialize tiles with terrain map
     }
 
     sf::RenderWindow window;
-
+    int getWindowWidth() const { return windowWidth; }
+    int getWindowHeight() const { return windowHeight; }
     bool isWindowOpen() const;
-    void drawElements();
+
+    void redrawElements();
 
     int checkButtonClick(sf::Vector2i mousePos, bool applyFeedback);
+
     int getHoveredTileIndex(sf::Vector2i mousePos);
     void highlightTile(int index);
     void permanentlyHighlightTile(int index);
-
+    void updateSimulationTileColors(const std::unordered_map<int, sf::Color>& updatedColors);
 };
 
-void Visualizer::initializeButtons(int tileSize) {
-    loadFont();
+void Visualizer::initializeButtons() {
 
+    int tileSize = windowHeight / world->TilesOnSide();
     int margin = 50;
     int xPosition = world->TilesOnSide() * tileSize + margin;
 
@@ -97,12 +84,12 @@ void Visualizer::initializeButtons(int tileSize) {
         // Create and initialize button label
         sf::Text label(buttonLabelsText[i], font, 20); // Use the font loaded earlier
         label.setPosition(xPosition + 10, 110 + i * 100); // Adjust label position
-        label.setFillColor(sf::Color::Black); // Set label color
+        label.setFillColor(sf::Color::Black);
         buttonLabels.push_back(label);
     }
 }
 
-void Visualizer::initializeTiles(int windowHeight) {
+void Visualizer::initializeTiles() {
 
     int allBordersSize = (world->TilesOnSide() - 1) * MARGIN_FOR_TILES; // there is one less border than number of tiles
     int tileSize = (windowHeight - allBordersSize) / world->TilesOnSide(); // Calculate tile size based on window height, margin and number of tiles
@@ -137,8 +124,8 @@ sf::Color Visualizer::getTileColor(int worldWidthPosition, int worldDepthPositio
     int tileIndex = worldWidthPosition * world->TilesOnSide() + worldDepthPosition;
 
     // Check if there's a custom color for this tile
-    auto it = customTileColors.find(tileIndex);
-    if (it != customTileColors.end()) {
+    auto it = simulationTileColors.find(tileIndex);
+    if (it != simulationTileColors.end()) {
         // If a custom color is found, return it
         return it->second;
     }
@@ -148,7 +135,7 @@ sf::Color Visualizer::getTileColor(int worldWidthPosition, int worldDepthPositio
     return grayScaleColor;
 }
 
-void Visualizer::drawElements() {
+void Visualizer::redrawElements() {
     window.clear();
 
     for (const auto& tile : tiles) {
@@ -174,10 +161,10 @@ int Visualizer::checkButtonClick(sf::Vector2i mousePos, bool applyFeedback = fal
             if (applyFeedback) {
                 // Change the button color to indicate it has been clicked
                 buttons[i].setFillColor(buttonHighlightColor);
-                drawElements(); // Redraw elements to show the feedback
+                redrawElements(); // Redraw elements to show the feedback
                 sf::sleep(sf::milliseconds(50)); // Short delay for feedback visibility
                 buttons[i].setFillColor(buttonDefaultColor); // Revert the button color
-                drawElements(); // Redraw elements to show the feedback
+                redrawElements(); // Redraw elements to show the feedback
             }
             return static_cast<int>(i); // Button was clicked, return its index
         }
@@ -214,7 +201,7 @@ void Visualizer::highlightTile(int index) {
     }
 
     if (needRedraw) {
-        drawElements();
+        redrawElements();
     }
 
     lastHighlightedTileIndex = index; // Update the last highlighted tile index
@@ -224,7 +211,7 @@ void Visualizer::permanentlyHighlightTile(int index) {
     if (index != -1) {
         permanentlyHighlightedTiles[index] = !permanentlyHighlightedTiles[index]; // Toggle the permanent highlight state
         tiles[index].setFillColor(permanentlyHighlightedTiles[index] ? tileHighlightColor : getTileColor(index / world->TilesOnSide(), index % world->TilesOnSide()));
-        drawElements();
+        redrawElements();
     }
 }
 
@@ -241,4 +228,12 @@ void Visualizer::resetPermanentlyHighlightedTiles() {
             tiles[i].setFillColor(getTileColor(row, col));
         }
     }
+}
+
+// Method to update tile colors based on simulation output
+void Visualizer::updateSimulationTileColors(const std::unordered_map<int, sf::Color>& updatedColors) {
+    for (const auto& [tileIndex, color] : updatedColors) {
+        simulationTileColors[tileIndex] = color;
+    }
+    initializeTiles();
 }
