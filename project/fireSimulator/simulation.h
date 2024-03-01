@@ -10,6 +10,26 @@ public:
     virtual std::vector<Tile*> GetLastChangedTiles() const = 0;
     virtual bool HasEnded() const = 0;
     virtual void Reset() = 0;
+    virtual std::vector<Tile*> GetProhibitedTiles() const = 0;
+    virtual std::unordered_map<int, sf::Color> GetChangedTileColors() const = 0;
+
+protected:
+    //  Uses a binary search algorithm to find the probability in each discrete step given the total probability and certain number of steps with the same chance/probability which together should make the total probability.
+    float GetStepProbability(float totalProbability, int updateSteps) {
+        float lowerBound = 0;
+        float upperBound = 1;
+        float p;
+        for (int i = 0; i < 100; ++i) {
+            p = (lowerBound + upperBound) / 2;
+            float calcTotalProbability = p * (1 - std::pow(1 - p, updateSteps)) / p;
+            if (calcTotalProbability > totalProbability) {
+                upperBound = p;
+            } else {
+                lowerBound = p;
+            }
+        }
+        return (lowerBound + upperBound) / 2;
+    }
 };
 
 
@@ -193,7 +213,7 @@ public:
         float combined = (vegetationFactor + slopeFactor) / 2;
         float adjustedProbability = combined * moistureFactor * windFactor;
 
-        return GetStepFireProbability(adjustedProbability, source->GetParameter<int>("burnTime")->GetValue());
+        return GetStepProbability(adjustedProbability, source->GetParameter<int>("burnTime")->GetValue());
     }
 
     // Helper methods for factor calculations
@@ -264,23 +284,5 @@ public:
         } else {
             return 0.25f * spreadFactor;
         }
-    }
-
-
-    //  Uses a binary search algorithm to find the probability of a tile catching fire within a certain number of steps, based on the total probability and burn time.
-    float GetStepFireProbability(float totalProbability, int BurnTime) {
-        float lowerBound = 0;
-        float upperBound = 1;
-        float p;
-        for (int i = 0; i < 100; ++i) {
-            p = (lowerBound + upperBound) / 2;
-            float calcTotalProbability = p * (1 - std::pow(1 - p, BurnTime)) / p;
-            if (calcTotalProbability > totalProbability) {
-                upperBound = p;
-            } else {
-                lowerBound = p;
-            }
-        }
-        return (lowerBound + upperBound) / 2;
     }
 };

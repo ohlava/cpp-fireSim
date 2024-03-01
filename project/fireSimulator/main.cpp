@@ -15,7 +15,7 @@ private:
     std::shared_ptr<World> world; // World object to hold the simulation state
     int worldSize = 30; // Choose a world size
 
-    std::unique_ptr<FireSpreadSimulation> fireSpreadSimulation;
+    std::unique_ptr<Simulation> simulation;
     std::vector<Tile*> initTiles; // Initially burning tiles for simulation
     std::vector<Tile*> prohibitedTiles; // Initially burning tiles for simulation
 
@@ -24,7 +24,7 @@ private:
     bool isMouseButtonPressed = false;
 
     sf::Clock updateClock; // Clock to track time since last simulation update
-    float updateInterval = 0.8f; // Interval in seconds between simulation updates
+    float updateInterval = 0.65f; // Interval in seconds between simulation updates
 
     enum class GameState {
         NewWorld, Running, Stopped
@@ -144,14 +144,14 @@ private:
                 // Interaction with the world allowed, but no simulation updates
                 break;
             case GameState::Running:
-                if (fireSpreadSimulation && updateClock.getElapsedTime().asSeconds() > updateInterval) {
-                    fireSpreadSimulation->Update();
-                    auto changedTiles = fireSpreadSimulation->GetChangedTileColors();
+                if (simulation && updateClock.getElapsedTime().asSeconds() > updateInterval) {
+                    simulation->Update();
+                    auto changedTiles = simulation->GetChangedTileColors();
                     visualizer.updateTileColors(changedTiles);
                     visualizer.redrawElements();
                     updateClock.restart(); // Restart the clock after an update
 
-                    if (fireSpreadSimulation->HasEnded()) {
+                    if (simulation->HasEnded()) {
                         std::cout << "Simulation ended" << std::endl;
                         state = GameState::Stopped;
                     }
@@ -165,10 +165,10 @@ private:
 
     //  It's a preparatory step before the simulation can run, ensuring it has all necessary initial conditions.
     void initializeSimulation() {
-        fireSpreadSimulation = std::make_unique<FireSpreadSimulation>(*world);
-        fireSpreadSimulation->Initialize(initTiles);
+        simulation = std::make_unique<FireSpreadSimulation>(*world);
+        simulation->Initialize(initTiles);
         prohibitedTiles.clear();
-        prohibitedTiles = fireSpreadSimulation->GetProhibitedTiles();
+        prohibitedTiles = simulation->GetProhibitedTiles();
     }
 
     // Creates and prepares a new simulation world and initializes the visualizer with it.
@@ -193,7 +193,7 @@ private:
             if (state == GameState::NewWorld) {
                 // Only initialize the simulation if it's in the NewWorld state
                 initializeSimulation();
-                auto changedTiles = fireSpreadSimulation->GetChangedTileColors();
+                auto changedTiles = simulation->GetChangedTileColors();
                 visualizer.updateTileColors(changedTiles);
                 visualizer.redrawElements();
             }
@@ -213,8 +213,8 @@ private:
         state = GameState::NewWorld;
         initTiles.clear();
 
-        if (fireSpreadSimulation) {
-            fireSpreadSimulation->Reset();
+        if (simulation) {
+            simulation->Reset();
         }
 
         visualizer.Reset();
