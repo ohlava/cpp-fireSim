@@ -150,6 +150,11 @@ private:
                     visualizer.updateTileColors(changedTiles);
                     visualizer.redrawElements();
                     updateClock.restart(); // Restart the clock after an update
+
+                    if (fireSpreadSimulation->HasEnded()) {
+                        std::cout << "Simulation ended" << std::endl;
+                        state = GameState::Stopped;
+                    }
                 }
                 break;
             case GameState::Stopped:
