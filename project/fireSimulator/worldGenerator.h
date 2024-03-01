@@ -6,7 +6,7 @@
 #include <ctime> // For time()
 #include "perlin.h"
 
-// General template definition
+// General template definition. A generic template for 2D maps of any type, supporting basic data manipulation.
 template<typename T>
 class Map {
 public:
@@ -29,7 +29,7 @@ public:
     }
 };
 
-// Partial specialization definition for float
+// Partial specialization definition for float with some extra methods.
 template<>
 class Map<float> {
 public:
@@ -106,34 +106,18 @@ public:
 };
 
 
+
+
+// Defines a common interface for map generators, allowing polymorphic use of different map generation strategies.
+template<typename T>
 class IMapGenerator {
 public:
     virtual ~IMapGenerator() = default;
-    // Potentially other general-purpose virtual functions
+
+    virtual Map<T> Generate() = 0;
 };
 
-class FloatMapGenerator : public IMapGenerator {
-public:
-    virtual Map<float> Generate() = 0;
-};
-
-class IntMapGenerator : public IMapGenerator {
-public:
-    virtual Map<int> Generate() = 0;
-};
-
-class BoolMapGenerator : public IMapGenerator {
-public:
-    virtual Map<bool> Generate() = 0;
-};
-
-class VegMapGenerator : public IMapGenerator {
-public:
-    virtual Map<VegetationType> Generate() = 0;
-};
-
-
-class BaseTerrainGenerator : public FloatMapGenerator {
+class BaseTerrainGenerator : public IMapGenerator<float> {
     int width, depth;
     int octaves;
     float persistence;
@@ -143,7 +127,7 @@ public:
     BaseTerrainGenerator(int width, int depth, int octaves = 5, float persistence = 0.4f, float scale = 5.0f) :
             width(width), depth(depth), octaves(octaves), persistence(persistence), scale(scale) {}
 
-    Map<float> Generate() {
+    Map<float> Generate() override {
         Map<float> map(width, depth);
 
         float offsetX = Random::Range(0, 10000);
@@ -177,7 +161,7 @@ public:
     }
 };
 
-class LakeMapGenerator : public BoolMapGenerator {
+class LakeMapGenerator : public IMapGenerator<bool> {
     Map<float>& heightMap;
     float lakeThreshold;
 
@@ -198,7 +182,7 @@ public:
     }
 };
 
-class RiverMapGenerator : public BoolMapGenerator {
+class RiverMapGenerator : public IMapGenerator<bool > {
     Map<float>& heightMap;
     Map<bool>& lakeMap;
     int rivers;
@@ -239,7 +223,7 @@ public:
     }
 };
 
-class MoistureMapGenerator : public IntMapGenerator {
+class MoistureMapGenerator : public IMapGenerator<int> {
 private:
     Map<float>& heightMap;
     Map<bool>& lakeMap;
@@ -248,15 +232,17 @@ private:
     int moistureRadius = 2;
     int maxMoisture = 100;
 
-    void SpreadMoisture(int x, int y, Map<int>& moistureMap) {
+    void SpreadMoisture(int x, int y, Map<int>& moistureMap) const {
         for (int dx = -moistureRadius; dx <= moistureRadius; dx++) {
             for (int dy = -moistureRadius; dy <= moistureRadius; dy++) {
                 int nx = x + dx;
                 int ny = y + dy;
 
+                // Check if the neighbor is within the map boundaries
                 if (nx >= 0 && nx < heightMap.width && ny >= 0 && ny < heightMap.depth) {
                     int distance = std::abs(dx) + std::abs(dy);
 
+                    // Apply moisture influence if within the moisture radius
                     if (distance <= moistureRadius) {
                         int influence = maxMoisture - (distance * (maxMoisture / moistureRadius));
                         moistureMap.SetData(nx, ny, std::min(moistureMap.GetData(nx, ny) + influence, maxMoisture));
@@ -278,7 +264,7 @@ public:
 
         for (int x = 0; x < heightMap.width; x++) {
             for (int y = 0; y < heightMap.depth; y++) {
-                if (lakeMap.GetData(x, y) == true || riverMap.GetData(x, y) == true) {
+                if (lakeMap.GetData(x, y) || riverMap.GetData(x, y)) {
                     moistureMap.SetData(x, y, maxMoisture);
                     SpreadMoisture(x, y, moistureMap);
                 } else {
@@ -298,12 +284,12 @@ public:
     }
 };
 
-class VegetationMapGenerator : public VegMapGenerator {
+class VegetationMapGenerator : public IMapGenerator<VegetationType> {
 private:
     Map<int>& moistureMap;
 
 public:
-    VegetationMapGenerator(Map<int>& moistureMap)
+    explicit VegetationMapGenerator(Map<int>& moistureMap)
             : moistureMap(moistureMap) {}
 
     Map<VegetationType> Generate() override {
@@ -313,7 +299,6 @@ public:
             for (int y = 0; y < moistureMap.depth; y++) {
                 int moisture = moistureMap.GetData(x, y);
 
-                // Default vegetation is Grass, no need to set it again
                 if (static_cast<float>(rand()) / RAND_MAX <= 0.85f) { // 85% probability
                     if (moisture < 30) {
                         vegetationMap.SetData(x, y, VegetationType::Sparse);
@@ -334,7 +319,8 @@ public:
 
 
 
-// Main Generator of the entire terrain using different generators
+// Main Generator of the entire terrain. Coordinates the generation of a complete world by utilizing various map generators.
+// It encapsulates the entire process of terrain generation, from basic terrain to specialized features like lakes, rivers, and vegetation
 class WorldGenerator {
 public:
     int width;
@@ -351,6 +337,7 @@ public:
     std::shared_ptr<World> Generate() {
         BaseTerrainGenerator heightMapGenerator(width, depth);
         auto heightMap = heightMapGenerator.Generate();
+        heightMap.Amplify(0.9f);
 
         LakeMapGenerator lakeMapGenerator(heightMap, lakeThreshold);
         auto lakeMap = lakeMapGenerator.Generate();
@@ -368,6 +355,8 @@ public:
     }
 
 private:
+
+    // Generates a World object from pre-generated maps of height, moisture, and vegetation.
     std::shared_ptr<World> GenerateWorldFromMaps(const Map<float>& heightMap, const Map<int>& moistureMap, const Map<VegetationType>& vegetationMap) {
         auto world = std::make_shared<World>(width, depth);
 
@@ -378,7 +367,7 @@ private:
                 VegetationType vegetation = vegetationMap.GetData(x, y);
 
                 if (moisture == 100) {
-                    height = 0.01f; // Ensure low height for maximum moisture areas
+                    height = 0.01f; // Ensure low height for maximum moisture areas / water tiles
                 }
 
                 // Create a new tile with the specified attributes

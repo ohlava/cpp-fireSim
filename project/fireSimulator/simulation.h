@@ -10,54 +10,25 @@ public:
     virtual std::vector<Tile*> GetLastChangedTiles() const = 0;
     virtual bool HasEnded() const = 0;
     virtual void Reset() = 0;
-    virtual bool VerifyRequiredParameters(World& world, const std::vector<Tile*>& tiles) const = 0;
 };
 
 
 
 class FireSpreadSimulation : public Simulation {
-    World& world_;
-    std::unordered_map<int, std::vector<Tile*>> changesOverTime_; // Tracks changed tiles at each time step - update of simulation
     int currentTime_;
 
+    World& world_;
     std::vector<Tile*> burningTiles_; // Currently burning tiles
     std::vector<Tile*> prohibitedTiles_; // Tiles that are not allowed to be clicked or to be start the simulation on / Here: all water tiles
+    std::unordered_map<int, std::vector<Tile*>> changesOverTime_; // Tracks changed tiles at each time step - update of simulation
 
 public:
-    FireSpreadSimulation(World& world) : world_(world), currentTime_(0) {
+    explicit FireSpreadSimulation(World& world) : world_(world), currentTime_(0) {
         InitWorldParameters();
         SetProhibitedTiles();
     }
 
-    void Initialize(std::vector<Tile*>& startingTiles) override {
-        currentTime_ = 0;
-        changesOverTime_.clear();
-        burningTiles_.clear();
-
-        for (auto& tile : startingTiles) {
-            auto isBurning = tile->GetParameter<bool>("isBurning");
-            if (isBurning) { // checks if the isBurning parameter exists for the tile
-                isBurning->SetValue(true); // Explicitly set starting tiles as burning
-                changesOverTime_[currentTime_].push_back(tile);
-                burningTiles_.push_back(tile);
-            }
-        }
-    }
-
-    void SetProhibitedTiles() {
-        for (auto& row : world_.grid) {
-            for (auto& tile : row) {
-                if (tile != nullptr && tile->GetMoisture() == 100) {
-                    prohibitedTiles_.push_back(tile);
-                }
-            }
-        }
-    }
-
-    std::vector<Tile*> GetProhibitedTiles() const {
-        return prohibitedTiles_;
-    }
-
+    //  Initializes global and tile-specific parameters relevant to fire spread, such as wind speed, direction, and fire-related properties of tiles.
     void InitWorldParameters() {
         // Initialize global parameters in the world
         world_.AddParameter("windSpeed", std::make_shared<TypedParameter<float>>(5.0f, 0.0f, 50.0f));
@@ -90,7 +61,6 @@ public:
                             // Keep default value if no matching vegetation type
                             break;
                     }
-
                     // Add burnTime parameter to the tile with the determined value
                     tile->AddParameter("burnTime", std::make_shared<TypedParameter<int>>(burnTime, 0, 5));
                 }
@@ -98,13 +68,47 @@ public:
         }
     }
 
-    void Update() override {
+    //  Identifies and records tiles that cannot be involved in the fire spread (e.g., water tiles).
+    void SetProhibitedTiles() {
+        for (auto& row : world_.grid) {
+            for (auto& tile : row) {
+                if (tile != nullptr && tile->GetMoisture() == 100) {
+                    prohibitedTiles_.push_back(tile);
+                }
+            }
+        }
+    }
 
+    // Returns the list of tiles that are prohibited from burning.
+    std::vector<Tile*> GetProhibitedTiles() const {
+        return prohibitedTiles_;
+    }
+
+
+
+    //  Sets up the simulation with specified starting tiles, marking them as burning.
+    void Initialize(std::vector<Tile*>& startingTiles) override {
+        currentTime_ = 0;
+        changesOverTime_.clear();
+        burningTiles_.clear();
+
+        for (auto& tile : startingTiles) {
+            auto isBurning = tile->GetParameter<bool>("isBurning");
+            if (isBurning) { // isBurning parameter exists for that tile
+                isBurning->SetValue(true); // Explicitly set starting tiles as burning
+                changesOverTime_[currentTime_].push_back(tile);
+                burningTiles_.push_back(tile);
+            }
+        }
+    }
+
+    // Advances the simulation by one time step, updating the state of burning tiles and spreading fire according to various factors.
+    void Update() override {
         currentTime_++; // Advance simulation time
 
         std::vector<Tile*> nextBurningTiles;
         for (auto* tile : burningTiles_) {
-            auto neighbors = world_.GetNeighborTiles(tile); // This function needs to be defined or adapted.
+            auto neighbors = world_.GetNeighborTiles(tile);
             for (auto* neighbor : neighbors) {
                 if (!neighbor->GetParameter<bool>("isBurning")->GetValue() && !neighbor->GetParameter<bool>("hasBurned")->GetValue()
                         && TryIgniteTile(tile, neighbor)) {
@@ -130,6 +134,28 @@ public:
         burningTiles_ = std::move(nextBurningTiles); // Update the list of burning tiles for the next cycle
     }
 
+    // Returns whether the simulation is completed.
+    bool HasEnded() const {
+        return burningTiles_.empty();
+    }
+
+    // Reinitializes the simulation and world parameters to their original/initial states.
+    void Reset() {
+        currentTime_ = 0;
+        changesOverTime_.clear();
+        burningTiles_.clear();
+        prohibitedTiles_.clear();
+
+        world_.ResetParameters(); // Resets global parameters
+        for (auto& row : world_.grid) {
+            for (auto& tile : row) {
+                tile->ResetParameters(); // Resets each tile's parameters
+            }
+        }
+    }
+
+
+    // Fetches the list of tiles whose state changed in the last update.
     std::vector<Tile*> GetLastChangedTiles() const override {
         auto it = changesOverTime_.find(currentTime_);
         if (it != changesOverTime_.end()) {
@@ -138,7 +164,7 @@ public:
         return std::vector<Tile*>();
     }
 
-
+    // Provides a mapping of tile indices to their corresponding colors based on their current state, aiding in visualization.
     std::unordered_map<int, sf::Color> GetChangedTileColors() const {
         std::unordered_map<int, sf::Color> tileColors;
         for (const auto& tile : GetLastChangedTiles()) {
@@ -150,43 +176,24 @@ public:
         return tileColors;
     }
 
-    bool HasEnded() const {
-        return burningTiles_.empty();
+
+    // Determines whether a target tile will ignite from a source tile based on the calculated spread probability, simulating randomness with a range comparison.
+    bool TryIgniteTile(Tile* source, Tile* target) {
+        float spreadProbability = CalculateFireSpreadProbability(source, target);
+        return Random::Range(0.0f, 1.0f) < spreadProbability;
     }
 
-    void Reset() {
-        currentTime_ = 0;
-        changesOverTime_.clear();
-        burningTiles_.clear();
-        prohibitedTiles_.clear();
+    // Integrates various environmental and situational factors to compute the overall probability of fire spreading from one tile to another.
+    float CalculateFireSpreadProbability(Tile* source, Tile* target) {
+        float vegetationFactor = GetVegetationFactor(target->GetVegetation(), 1.0f);
+        float moistureFactor = GetMoistureFactor(target->GetMoisture(), 1.0f);
+        float windFactor = GetWindFactor(world_, source, target,1.0f);
+        float slopeFactor = GetSlopeFactor(source, target, 1.0f);
 
-        // Reset world and tiles to their initial state
-        world_.ResetParameters(); // Resets global parameters like wind
-        for (auto& row : world_.grid) {
-            for (auto& tile : row) {
-                tile->ResetParameters(); // Resets each tile's parameters
-            }
-        }
-    }
+        float combined = (vegetationFactor + slopeFactor) / 2;
+        float adjustedProbability = combined * moistureFactor * windFactor;
 
-    // Implementation of required parameters verification
-    virtual bool VerifyRequiredParameters(World& world, const std::vector<Tile*>& tiles) const override {
-        // Verify world parameters
-        if (!world.GetParameter<float>("windSpeed") || !world.GetParameter<int>("windDirection")) {
-            std::cerr << "World is missing required wind parameters." << std::endl;
-            return false;
-        }
-
-        // Verify tile parameters
-        for (const auto& tile : tiles) {
-            if (!tile->GetParameter<bool>("hasBurned") || !tile->GetParameter<int>("burnTime") ||
-                !tile->GetParameter<int>("burningFor") || !tile->GetParameter<bool>("isBurning")) {
-                std::cerr << "One or more tiles are missing required fire parameters." << std::endl;
-                return false;
-            }
-        }
-
-        return true; // All required parameters are present
+        return GetStepFireProbability(adjustedProbability, source->GetParameter<int>("burnTime")->GetValue());
     }
 
     // Helper methods for factor calculations
@@ -201,6 +208,7 @@ public:
         return factor * spreadFactor;
     }
 
+    // Helper methods for factor calculations
     float GetMoistureFactor(int moisture, float spreadFactor) {
         if (moisture == 100) {
             return 0; // water tile
@@ -215,6 +223,7 @@ public:
         }
     }
 
+    // Helper methods for factor calculations
     float GetWindFactor(World& world, Tile* source, Tile* target, float spreadFactor) {
         auto windSpeed = world.GetParameter<float>("windSpeed")->GetValue();
         auto windDirection = world.GetParameter<int>("windDirection")->GetValue();
@@ -234,11 +243,11 @@ public:
         }
 
         // Adjust spread factor based on wind direction and speed
-        float windEffect = 1.0f; // Base wind effect
+        float windEffect = 1.0f;
         if (directionDifference <= 45) { // If wind is blowing directly towards the target
-            windEffect += windSpeed * 0.03; // Increase spread factor by a percentage of the wind speed
+            windEffect += windSpeed * 0.03;
         } else if (directionDifference <= 90) {
-            windEffect += windSpeed * 0.015; // Smaller increase if wind is not directly aligned
+            windEffect += windSpeed * 0.015;
         }
 
         // Ensure wind effect does not exceed a maximum threshold
@@ -247,6 +256,7 @@ public:
         return windEffect * spreadFactor;
     }
 
+    // Helper methods for factor calculations
     float GetSlopeFactor(Tile* source, Tile* target, float spreadFactor) {
         float slopeDifference = target->GetHeight() - source->GetHeight();
         if (slopeDifference >= 0) {
@@ -256,18 +266,8 @@ public:
         }
     }
 
-    float CalculateFireSpreadProbability(Tile* source, Tile* target) {
-        float vegetationFactor = GetVegetationFactor(target->GetVegetation(), 1.0f);
-        float moistureFactor = GetMoistureFactor(target->GetMoisture(), 1.0f);
-        float windFactor = GetWindFactor(world_, source, target,1.0f);
-        float slopeFactor = GetSlopeFactor(source, target, 1.0f);
 
-        float combined = (vegetationFactor + slopeFactor) / 2;
-        float adjustedProbability = combined * moistureFactor * windFactor;
-
-        return GetStepFireProbability(adjustedProbability, source->GetParameter<int>("burnTime")->GetValue());
-    }
-
+    //  Uses a binary search algorithm to find the probability of a tile catching fire within a certain number of steps, based on the total probability and burn time.
     float GetStepFireProbability(float totalProbability, int BurnTime) {
         float lowerBound = 0;
         float upperBound = 1;
@@ -283,10 +283,4 @@ public:
         }
         return (lowerBound + upperBound) / 2;
     }
-
-    bool TryIgniteTile(Tile* source, Tile* target) {
-        float spreadProbability = CalculateFireSpreadProbability(source, target);
-        return Random::Range(0.0f, 1.0f) < spreadProbability;
-    }
-
 };

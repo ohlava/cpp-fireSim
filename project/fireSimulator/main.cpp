@@ -13,12 +13,11 @@
 class MainLogic {
 private:
     std::shared_ptr<World> world; // World object to hold the simulation state
-    int worldSize = 30;
+    int worldSize = 30; // Choose a world size
 
     std::unique_ptr<FireSpreadSimulation> fireSpreadSimulation;
     std::vector<Tile*> initTiles; // Initially burning tiles for simulation
     std::vector<Tile*> prohibitedTiles; // Initially burning tiles for simulation
-
 
     Visualizer visualizer; // The visualizer for rendering
 
@@ -29,15 +28,15 @@ private:
 
     enum class GameState {
         NewWorld, Running, Stopped
-    } state; // Game state
+    } state; // Game/simulation state
 
 public:
     MainLogic() : world(nullptr), visualizer(std::make_shared<World>(worldSize, worldSize), 800, 600), state(GameState::NewWorld) {
         generateNewWorld();
     }
 
+    // Main loop to handle game state transitions, input events, and updates. It drives the simulation and rendering process, ensuring the game progresses and reacts to user input.
     void run() {
-        // Main loop to handle game state transitions and updates
         sf::Clock clock;
         while (visualizer.isWindowOpen()) {
 
@@ -56,8 +55,9 @@ public:
     }
 
 private:
+
+    //Processes user inputs to interact with the simulation or UI elements. Making the simulation interactive, allowing users to modify the simulation state or trigger actions.
     void handleInputEvents(sf::Clock& clock) {
-        // Handle user input to change game state or interact with the world
         sf::Event event;
 
         while (visualizer.window.pollEvent(event)) {
@@ -75,8 +75,7 @@ private:
             else if (event.type == sf::Event::MouseButtonReleased) {
                 isMouseButtonPressed = false;
             }
-            else if (event.type == sf::Event::MouseMoved && isMouseButtonPressed) {
-                // Handle drag event
+            else if (event.type == sf::Event::MouseMoved && isMouseButtonPressed) { // Handle drag event
                 handleTileInteraction(sf::Mouse::getPosition(visualizer.window));
             }
             else if (event.type == sf::Event::MouseMoved) {
@@ -88,13 +87,17 @@ private:
         }
     }
 
+    // Allows the user to interact with specific tiles in the world, typically to start or stop the fire.
     void handleTileInteraction(const sf::Vector2i& mousePos) {
+
         if (state == GameState::NewWorld) { // Only allow tile interaction in NewWorld state
             auto [x, y] = visualizer.getHoveredTileCoords(mousePos);
+
             if (x != -1 && y != -1) { // Valid tile
+
                 Tile* clickedTile = world->GetTileAt(x, y);
                 if (std::find(prohibitedTiles.begin(), prohibitedTiles.end(), clickedTile) != prohibitedTiles.end()) {
-                    // This tile is prohibited, ignore the click
+                    // This tile is prohibited by simulation, ignore the click and return
                     return;
                 }
                 if (std::find(initTiles.begin(), initTiles.end(), clickedTile) == initTiles.end()) {
@@ -108,6 +111,7 @@ private:
         }
     }
 
+    // Handles clicks on UI buttons. It provides a direct interface for controlling the simulation flow.
     void handleButtonInteraction(const sf::Vector2i& mousePos) {
         int buttonIndex = visualizer.checkButtonClick(mousePos, true);
         if (buttonIndex != -1) {
@@ -132,6 +136,29 @@ private:
         }
     }
 
+
+    // Updates the simulation state and visual representation based on the elapsed time. It's the core of the simulation logic, advancing the simulation according to its rules.
+    void update() {
+        switch (state) {
+            case GameState::NewWorld:
+                // Interaction with the world allowed, but no simulation updates
+                break;
+            case GameState::Running:
+                if (fireSpreadSimulation && updateClock.getElapsedTime().asSeconds() > updateInterval) {
+                    fireSpreadSimulation->Update();
+                    auto changedTiles = fireSpreadSimulation->GetChangedTileColors();
+                    visualizer.updateTileColors(changedTiles);
+                    visualizer.redrawElements();
+                    updateClock.restart(); // Restart the clock after an update
+                }
+                break;
+            case GameState::Stopped:
+                // Simulation is paused, no updates
+                break;
+        }
+    }
+
+    //  It's a preparatory step before the simulation can run, ensuring it has all necessary initial conditions.
     void initializeSimulation() {
         fireSpreadSimulation = std::make_unique<FireSpreadSimulation>(*world);
         fireSpreadSimulation->Initialize(initTiles);
@@ -139,7 +166,7 @@ private:
         prohibitedTiles = fireSpreadSimulation->GetProhibitedTiles();
     }
 
-
+    // Creates and prepares a new simulation world and initializes the visualizer with it.
     void generateNewWorld() {
         WorldGenerator worldGenerator(worldSize, worldSize, 0.15f, 3);
         world = worldGenerator.Generate();
@@ -150,6 +177,7 @@ private:
         resetSimulation();
     }
 
+    // Begins new or continues old simulation based on the current game state.
     void startSimulation() {
         if (initTiles.empty() && state == GameState::NewWorld) {
             std::cout << "Ignite some tiles first!" << std::endl;
@@ -161,7 +189,7 @@ private:
                 // Only initialize the simulation if it's in the NewWorld state
                 initializeSimulation();
                 auto changedTiles = fireSpreadSimulation->GetChangedTileColors();
-                visualizer.updateSimulationTileColors(changedTiles);
+                visualizer.updateTileColors(changedTiles);
                 visualizer.redrawElements();
             }
             state = GameState::Running;
@@ -170,10 +198,12 @@ private:
         }
     }
 
+    // Pauses the simulation, allowing it to be resumed later.
     void stopSimulation() {
         state = GameState::Stopped;
     }
 
+    // Resets the simulation to a new state, clearing any ongoing simulation data. It allows for a complete restart of the simulation, clearing all previous interactions and data.
     void resetSimulation() {
         state = GameState::NewWorld;
         initTiles.clear();
@@ -184,30 +214,13 @@ private:
 
         visualizer.Reset();
     }
-
-    void update() {
-        switch (state) {
-            case GameState::NewWorld:
-                // Interaction with the world allowed, but no simulation updates
-                break;
-            case GameState::Running:
-                if (fireSpreadSimulation && updateClock.getElapsedTime().asSeconds() > updateInterval) {
-                    fireSpreadSimulation->Update();
-                    auto changedTiles = fireSpreadSimulation->GetChangedTileColors();
-                    visualizer.updateSimulationTileColors(changedTiles);
-                    visualizer.redrawElements();
-                    updateClock.restart(); // Restart the clock after an update
-                }
-                break;
-            case GameState::Stopped:
-                // Simulation is paused, no updates
-                break;
-        }
-    }
 };
 
+
+
+// Entry to the simulator
 int main() {
-    MainLogic logic; // Create the game logic with a 100x100 world
+    MainLogic logic;
     logic.run(); // Run the game
     return 0;
 }

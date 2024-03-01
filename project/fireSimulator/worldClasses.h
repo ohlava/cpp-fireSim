@@ -7,15 +7,14 @@
 #include <cmath> // for std::max
 
 
-
-// Parameter class for changeable properties
+// Parameter class for changeable properties within the simulation
 class Parameter {
 public:
     virtual ~Parameter() = default;
     virtual void Reset() = 0;
 };
 
-// Template class for specific types of parameters
+// Template class for specific types of parameters of any simulation. Controlling value ranges and providing a mechanism to reset to initial values.
 template<typename T>
 class TypedParameter : public Parameter {
     T initialValue_;
@@ -40,7 +39,7 @@ public:
     }
 };
 
-// Container for managing parameters
+// Container for managing parameters. Manages a collection of parameters, allowing adding and retrieving typed parameters.
 class ParameterContainer {
     std::unordered_map<std::string, std::shared_ptr<Parameter>> parameters_;
 
@@ -74,7 +73,7 @@ enum class VegetationType {
     Swamp
 };
 
-// Tile class
+// Tile class for World class grid. Represent a terrain tile with attributes like height, moisture, and vegetation type, plus some optional parameters in a specific context.
 class Tile : public ParameterContainer {
 public:
     Tile(float height, int moisture, VegetationType vegetation, int positionX, int positionY)
@@ -82,24 +81,21 @@ public:
               widthPosition_(positionX), depthPosition_(positionY) {
     }
 
-    void Reset() {
-    }
-
     // Getters and setters
     int GetWidthPosition() const { return widthPosition_; }
-    void SetWidthPosition(int position) { widthPosition_ = std::max(0, position); }
+    // void SetWidthPosition(int position) { widthPosition_ = std::max(0, position); }
 
     int GetDepthPosition() const { return depthPosition_; }
-    void SetDepthPosition(int position) { depthPosition_ = std::max(0, position); }
+    // void SetDepthPosition(int position) { depthPosition_ = std::max(0, position); }
 
     float GetHeight() const { return height_; }
-    void SetHeight(float height) { height_ = std::max(0.0f, height); }
+    // void SetHeight(float height) { height_ = std::max(0.0f, height); }
 
     int GetMoisture() const { return moisture_; }
-    void SetMoisture(int moisture) { moisture_ = std::max(0, std::min(100, moisture)); }
+    // void SetMoisture(int moisture) { moisture_ = std::max(0, std::min(100, moisture)); }
 
     VegetationType GetVegetation() const { return vegetation_; }
-    void SetVegetation(VegetationType vegetation) { vegetation_ = vegetation; }
+    // void SetVegetation(VegetationType vegetation) { vegetation_ = vegetation; }
 
 private:
     int widthPosition_, depthPosition_;
@@ -108,7 +104,7 @@ private:
     VegetationType vegetation_;
 };
 
-// World-class
+// World-class - Contains a 2D grid of Tile pointers, managing the terrain layout.
 class World : public ParameterContainer {
 public:
     std::vector<std::vector<Tile*>> grid; // 2D grid of Tile pointers
@@ -116,15 +112,7 @@ public:
     World(int width, int depth) : width_(std::max(0, width)), depth_(std::max(0, depth)) {
         grid.resize(width_);
         for (int i = 0; i < width_; ++i) {
-            grid[i].resize(depth_, nullptr); // Initialize with nullptrs or actual Tile objects
-        }
-    }
-
-    void Reset() {
-        for (auto& row : grid) {
-            for (auto& tile : row) {
-                if (tile) tile->Reset();
-            }
+            grid[i].resize(depth_, nullptr); // Initialize with null pointers or actual Tile objects
         }
     }
 
@@ -149,6 +137,7 @@ public:
         grid[x][y] = tile; // Place the new tile
     }
 
+    // Method for accessing neighboring tiles.
     std::vector<Tile*> GetNeighborTiles(Tile* tile, int distance = 1) {
         std::vector<Tile*> neighbors;
         int x = tile->GetWidthPosition();
@@ -166,6 +155,7 @@ public:
         return neighbors;
     }
 
+    // Method for accessing neighboring tiles neighboring just by the edge of some tile.
     std::vector<Tile*> GetEdgeNeighborTiles(Tile* tile) {
         std::vector<Tile*> edgeNeighbors;
         int x = tile->GetWidthPosition();
@@ -179,7 +169,7 @@ public:
         return edgeNeighbors;
     }
 
-    int TilesOnSide() {
+    int TilesOnSide() const {
         if (width_ != depth_) {
             throw std::runtime_error("There could be a problem, sizes of sides are not the same");
         }
