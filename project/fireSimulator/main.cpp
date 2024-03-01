@@ -16,7 +16,9 @@ private:
     int worldSize = 30;
 
     std::unique_ptr<FireSpreadSimulation> fireSpreadSimulation;
-    std::vector<Tile*> initBurningTiles; // Initially burning tiles for simulation
+    std::vector<Tile*> initTiles; // Initially burning tiles for simulation
+    std::vector<Tile*> prohibitedTiles; // Initially burning tiles for simulation
+
 
     Visualizer visualizer; // The visualizer for rendering
 
@@ -91,11 +93,15 @@ private:
             auto [x, y] = visualizer.getHoveredTileCoords(mousePos);
             if (x != -1 && y != -1) { // Valid tile
                 Tile* clickedTile = world->GetTileAt(x, y);
-                if (std::find(initBurningTiles.begin(), initBurningTiles.end(), clickedTile) == initBurningTiles.end()) {
-                    initBurningTiles.push_back(clickedTile);
+                if (std::find(prohibitedTiles.begin(), prohibitedTiles.end(), clickedTile) != prohibitedTiles.end()) {
+                    // This tile is prohibited, ignore the click
+                    return;
+                }
+                if (std::find(initTiles.begin(), initTiles.end(), clickedTile) == initTiles.end()) {
+                    initTiles.push_back(clickedTile);
                     visualizer.permanentlyHighlightTile(x, y);
                 } else {
-                    initBurningTiles.erase(std::remove(initBurningTiles.begin(), initBurningTiles.end(), clickedTile), initBurningTiles.end());
+                    initTiles.erase(std::remove(initTiles.begin(), initTiles.end(), clickedTile), initTiles.end());
                     visualizer.permanentlyHighlightTile(x, y);
                 }
             }
@@ -126,17 +132,26 @@ private:
         }
     }
 
+    void initializeSimulation() {
+        fireSpreadSimulation = std::make_unique<FireSpreadSimulation>(*world);
+        fireSpreadSimulation->Initialize(initTiles);
+        prohibitedTiles.clear();
+        prohibitedTiles = fireSpreadSimulation->GetProhibitedTiles();
+    }
+
+
     void generateNewWorld() {
         WorldGenerator worldGenerator(worldSize, worldSize, 0.15f, 3);
         world = worldGenerator.Generate();
         visualizer.setWorld(world);
         visualizer.redrawElements();
 
+        initializeSimulation();
         resetSimulation();
     }
 
     void startSimulation() {
-        if (initBurningTiles.empty() && state == GameState::NewWorld) {
+        if (initTiles.empty() && state == GameState::NewWorld) {
             std::cout << "Ignite some tiles first!" << std::endl;
             return;
         }
@@ -144,12 +159,14 @@ private:
         if (state == GameState::Stopped || state == GameState::NewWorld) {
             if (state == GameState::NewWorld) {
                 // Only initialize the simulation if it's in the NewWorld state
-                fireSpreadSimulation = std::make_unique<FireSpreadSimulation>(*world);
-                fireSpreadSimulation->Initialize(initBurningTiles);
+                initializeSimulation();
+                auto changedTiles = fireSpreadSimulation->GetChangedTileColors();
+                visualizer.updateSimulationTileColors(changedTiles);
+                visualizer.redrawElements();
             }
             state = GameState::Running;
             updateClock.restart(); // Restart the clock when the simulation starts or continues
-            std::cout << "Simulation running" << std::endl;
+            std::cout << "Simulation running..." << std::endl;
         }
     }
 
@@ -159,7 +176,7 @@ private:
 
     void resetSimulation() {
         state = GameState::NewWorld;
-        initBurningTiles.clear();
+        initTiles.clear();
 
         if (fireSpreadSimulation) {
             fireSpreadSimulation->Reset();

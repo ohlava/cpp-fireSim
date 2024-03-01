@@ -7,7 +7,7 @@ public:
     virtual ~Simulation() = default;
     virtual void Initialize(std::vector<Tile*>& startingTiles) = 0;
     virtual void Update() = 0;
-    virtual std::vector<Tile*> GetChangedTiles() const = 0;
+    virtual std::vector<Tile*> GetLastChangedTiles() const = 0;
     virtual bool HasEnded() const = 0;
     virtual void Reset() = 0;
     virtual bool VerifyRequiredParameters(World& world, const std::vector<Tile*>& tiles) const = 0;
@@ -20,11 +20,13 @@ class FireSpreadSimulation : public Simulation {
     std::unordered_map<int, std::vector<Tile*>> changesOverTime_; // Tracks changed tiles at each time step - update of simulation
     int currentTime_;
 
-    std::vector<Tile*> burningTiles_;
+    std::vector<Tile*> burningTiles_; // Currently burning tiles
+    std::vector<Tile*> prohibitedTiles_; // Tiles that are not allowed to be clicked or to be start the simulation on / Here: all water tiles
 
 public:
     FireSpreadSimulation(World& world) : world_(world), currentTime_(0) {
         InitWorldParameters();
+        SetProhibitedTiles();
     }
 
     void Initialize(std::vector<Tile*>& startingTiles) override {
@@ -40,6 +42,20 @@ public:
                 burningTiles_.push_back(tile);
             }
         }
+    }
+
+    void SetProhibitedTiles() {
+        for (auto& row : world_.grid) {
+            for (auto& tile : row) {
+                if (tile != nullptr && tile->GetMoisture() == 100) {
+                    prohibitedTiles_.push_back(tile);
+                }
+            }
+        }
+    }
+
+    std::vector<Tile*> GetProhibitedTiles() const {
+        return prohibitedTiles_;
     }
 
     void InitWorldParameters() {
@@ -114,7 +130,7 @@ public:
         burningTiles_ = std::move(nextBurningTiles); // Update the list of burning tiles for the next cycle
     }
 
-    std::vector<Tile*> GetChangedTiles() const override {
+    std::vector<Tile*> GetLastChangedTiles() const override {
         auto it = changesOverTime_.find(currentTime_);
         if (it != changesOverTime_.end()) {
             return it->second;
@@ -125,7 +141,7 @@ public:
 
     std::unordered_map<int, sf::Color> GetChangedTileColors() const {
         std::unordered_map<int, sf::Color> tileColors;
-        for (const auto& tile : GetChangedTiles()) {
+        for (const auto& tile : GetLastChangedTiles()) {
             // Determine color based on tile properties
             sf::Color color = tile->GetParameter<bool>("isBurning")->GetValue()? sf::Color(255, 105, 105) : sf::Color(180, 50, 50);
             int tileIndex = tile->GetWidthPosition() * world_.TilesOnSide() + tile->GetDepthPosition();// Logic to get tile's index in the visualizer
@@ -142,6 +158,7 @@ public:
         currentTime_ = 0;
         changesOverTime_.clear();
         burningTiles_.clear();
+        prohibitedTiles_.clear();
 
         // Reset world and tiles to their initial state
         world_.ResetParameters(); // Resets global parameters like wind
