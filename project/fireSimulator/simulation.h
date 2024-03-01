@@ -242,7 +242,7 @@ public:
     float CalculateFireSpreadProbability(Tile* source, Tile* target) {
         float vegetationFactor = GetVegetationFactor(target->GetVegetation(), 1.0f);
         float moistureFactor = GetMoistureFactor(target->GetMoisture(), 1.0f);
-        float windFactor = GetWindFactor(world_, source, target,1.0f); // Add necessary arguments
+        float windFactor = GetWindFactor(world_, source, target,1.0f);
         float slopeFactor = GetSlopeFactor(source, target, 1.0f);
 
         float combined = (vegetationFactor + slopeFactor) / 2;

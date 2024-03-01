@@ -23,7 +23,7 @@ private:
     bool isMouseButtonPressed = false;
 
     sf::Clock updateClock; // Clock to track time since last simulation update
-    float updateInterval = 1.0f; // Interval in seconds between simulation updates
+    float updateInterval = 0.8f; // Interval in seconds between simulation updates
 
     enum class GameState {
         NewWorld, Running, Stopped

@@ -131,8 +131,8 @@ sf::Color Visualizer::getTileColor(int worldWidthPosition, int worldDepthPositio
     }
 
     float terrainValue = world->GetTileAt(worldWidthPosition, worldDepthPosition)->GetHeight(); // Use terrain value for color
-    sf::Color grayScaleColor = sf::Color(terrainValue * 255, terrainValue * 255, terrainValue * 255);
-    return grayScaleColor;
+    sf::Color greenTintedColor = sf::Color(0, terrainValue * 255, 0);
+    return greenTintedColor;
 }
 
 void Visualizer::redrawElements() {
@@ -189,9 +189,6 @@ std::pair<int, int> Visualizer::getHoveredTileCoords(sf::Vector2i mousePos) {
 
 void Visualizer::highlightTile(int row, int col) {
     bool needRedraw = false;
-
-
-
 
     // Unhighlight the previous tile if necessary and it's not permanently highlighted
     if (lastHighlightedTileCoords.first != -1 && lastHighlightedTileCoords.second != -1 &&
