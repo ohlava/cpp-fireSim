@@ -7,13 +7,14 @@ public:
     virtual ~Simulation() = default;
     virtual void Initialize(std::vector<Tile*>& startingTiles) = 0;
     virtual void Update() = 0;
-    virtual std::vector<Tile*> GetLastChangedTiles() const = 0;
     virtual bool HasEnded() const = 0;
     virtual void Reset() = 0;
+    virtual std::vector<Tile*> GetLastChangedTiles() const = 0;
     virtual std::vector<Tile*> GetProhibitedTiles() const = 0;
     virtual std::unordered_map<int, sf::Color> GetChangedTileColors() const = 0;
 
 protected:
+
     //  Uses a binary search algorithm to find the probability in each discrete step given the total probability and certain number of steps with the same chance/probability which together should make the total probability.
     float GetStepProbability(float totalProbability, int updateSteps) {
         float lowerBound = 0;
