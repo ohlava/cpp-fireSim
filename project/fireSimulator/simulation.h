@@ -51,39 +51,35 @@ public:
 
     //  Initializes global and tile-specific parameters relevant to fire spread, such as wind speed, direction, and fire-related properties of tiles.
     void InitWorldParameters() {
+
+        size_t totalTiles = world_.GetWidth() * world_.GetDepth();
+
         // Initialize global parameters in the world
         world_.AddParameter("windSpeed", std::make_shared<TypedParameter<float>>(5.0f, 0.0f, 50.0f));
         world_.AddParameter("windDirection", std::make_shared<TypedParameter<int>>(0, 0, 360));
 
-        // Initialize fire-related parameters for all tiles in the world
-        for (auto& row : world_.grid) {
-            for (auto& tile : row) {
-                if (tile != nullptr) { // Ensure the tile exists
-                    tile->AddParameter("isBurning", std::make_shared<TypedParameter<bool>>(false, false, true));
-                    tile->AddParameter("hasBurned", std::make_shared<TypedParameter<bool>>(false, false, true));
-                    tile->AddParameter("burningFor", std::make_shared<TypedParameter<int>>(0, 0, 5));
+        world_.AddVectorParameter<bool>("isBurning", totalTiles, false, false, true);
+        world_.AddVectorParameter<bool>("hasBurned", totalTiles, false, false, true);
+        world_.AddVectorParameter<int>("burningFor", totalTiles, 0, 0, 5);
+        world_.AddVectorParameter<int>("burnTime", totalTiles, 5, 0, 5);
 
-                    // Determine burnTime based on vegetation type
-                    int burnTime = 5; // Default burn time
+        // Initialize fire-related parameters for all tiles in the world
+        for (int i = 0; i < world_.grid.size(); ++i) {
+            for (int j = 0; j < world_.grid.size(); ++j) {
+                Tile* tile = world_.grid[i][j];
+                if (tile != nullptr) {
+                    int index = i * world_.GetDepth() + j;
+                    int burnTime = 5;
+
                     switch (tile->GetVegetation()) {
-                        case VegetationType::Grass:
-                            burnTime = 1;
-                            break;
-                        case VegetationType::Sparse:
-                            burnTime = 2;
-                            break;
-                        case VegetationType::Swamp:
-                            burnTime = 3;
-                            break;
-                        case VegetationType::Forest:
-                            burnTime = 4;
-                            break;
-                        default:
-                            // Keep default value if no matching vegetation type
-                            break;
+                        case VegetationType::Grass: burnTime = 1; break;
+                        case VegetationType::Sparse: burnTime = 2; break;
+                        case VegetationType::Swamp: burnTime = 3; break;
+                        case VegetationType::Forest: burnTime = 4; break;
                     }
-                    // Add burnTime parameter to the tile with the determined value
-                    tile->AddParameter("burnTime", std::make_shared<TypedParameter<int>>(burnTime, 0, 5));
+
+                    auto burnTimeParam = world_.GetVectorParameter<int>("burnTime");
+                    burnTimeParam->SetValue(index, burnTime);
                 }
             }
         }
@@ -113,13 +109,12 @@ public:
         changesOverTime_.clear();
         burningTiles_.clear();
 
+        auto isBurningParam = world_.GetVectorParameter<bool>("isBurning");
+
         for (auto& tile : startingTiles) {
-            auto isBurning = tile->GetParameter<bool>("isBurning");
-            if (isBurning) { // isBurning parameter exists for that tile
-                isBurning->SetValue(true); // Explicitly set starting tiles as burning
+                isBurningParam->SetValue(world_.GetTileIndex(tile), true);
                 changesOverTime_[currentTime_].push_back(tile);
                 burningTiles_.push_back(tile);
-            }
         }
     }
 
@@ -127,27 +122,33 @@ public:
     void Update() override {
         currentTime_++; // Advance simulation time
 
+        auto isBurningParam = world_.GetVectorParameter<bool>("isBurning");
+        auto hasBurnedParam = world_.GetVectorParameter<bool>("hasBurned");
+        auto burningForParam = world_.GetVectorParameter<int>("burningFor");
+        auto burnTimeParam = world_.GetVectorParameter<int>("burnTime");
+
         std::vector<Tile*> nextBurningTiles;
         for (auto* tile : burningTiles_) {
+            std::size_t tileIndex = world_.GetTileIndex(tile);
             auto neighbors = world_.GetNeighborTiles(tile);
             for (auto* neighbor : neighbors) {
-                if (!neighbor->GetParameter<bool>("isBurning")->GetValue() && !neighbor->GetParameter<bool>("hasBurned")->GetValue()
-                        && TryIgniteTile(tile, neighbor)) {
+                std::size_t neighborIndex = world_.GetTileIndex(neighbor);
+                if (!isBurningParam->GetValue(neighborIndex) && !hasBurnedParam->GetValue(neighborIndex) && TryIgniteTile(tile, neighbor)) {
                     // Neighbor tile catching on fire
                     nextBurningTiles.push_back(neighbor);
-                    neighbor->GetParameter<bool>("isBurning")->SetValue(true);
+                    isBurningParam->SetValue(neighborIndex, true);
                     changesOverTime_[currentTime_].push_back(neighbor);
                 }
             }
 
             // Update burning duration
-            auto burningFor = tile->GetParameter<int>("burningFor")->GetValue() + 1;
-            if (burningFor >= tile->GetParameter<int>("burnTime")->GetValue()) {
-                tile->GetParameter<bool>("isBurning")->SetValue(false);
-                tile->GetParameter<bool>("hasBurned")->SetValue(true);
+            auto burningFor = burningForParam->GetValue(tileIndex) + 1;
+            if (burningFor >= burnTimeParam->GetValue(tileIndex)) {
+                isBurningParam->SetValue(tileIndex, false);
+                hasBurnedParam->SetValue(tileIndex, true);
                 changesOverTime_[currentTime_].push_back(tile);
             } else {
-                tile->GetParameter<int>("burningFor")->SetValue(burningFor);
+                burningForParam->SetValue(tileIndex, burningFor);
                 nextBurningTiles.push_back(tile);
             }
         }
@@ -189,9 +190,9 @@ public:
     std::unordered_map<int, sf::Color> GetChangedTileColors() const {
         std::unordered_map<int, sf::Color> tileColors;
         for (const auto& tile : GetLastChangedTiles()) {
+            std::size_t tileIndex = world_.GetTileIndex(tile); // Logic to get tile's index in the visualizer
             // Determine color based on tile properties
-            sf::Color color = tile->GetParameter<bool>("isBurning")->GetValue()? sf::Color(255, 105, 105) : sf::Color(180, 50, 50);
-            int tileIndex = tile->GetWidthPosition() * world_.TilesOnSide() + tile->GetDepthPosition();// Logic to get tile's index in the visualizer
+            sf::Color color = world_.GetVectorParameter<bool>("isBurning")->GetValue(tileIndex)? sf::Color(255, 105, 105) : sf::Color(180, 50, 50);
             tileColors[tileIndex] = color;
         }
         return tileColors;
@@ -214,7 +215,7 @@ public:
         float combined = (vegetationFactor + slopeFactor) / 2;
         float adjustedProbability = combined * moistureFactor * windFactor;
 
-        return GetStepProbability(adjustedProbability, source->GetParameter<int>("burnTime")->GetValue());
+        return GetStepProbability(adjustedProbability, world_.GetVectorParameter<int>("burnTime")->GetValue(source->GetWidthPosition() * world_.GetDepth() + source->GetDepthPosition()));
     }
 
     // Helper methods for factor calculations

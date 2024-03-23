@@ -1,6 +1,7 @@
 #pragma once
 #include <algorithm>
 #include <iostream>
+#include <utility>
 #include <vector>
 #include <stdexcept>
 #include <random>
@@ -39,26 +40,72 @@ public:
     }
 };
 
+template<typename T>
+class TypedVectorParameter {
+    std::vector<T> values_;
+    T initialValue_;
+    T minValue_;
+    T maxValue_;
+
+public:
+    TypedVectorParameter(size_t size, T initialValue, T minValue, T maxValue)
+            : values_(size, initialValue), initialValue_(initialValue), minValue_(minValue), maxValue_(maxValue) {}
+
+    void SetValue(size_t index, T value) {
+        if (index >= values_.size()) {
+            throw std::out_of_range("Index out of range");
+        }
+        values_[index] = std::max(minValue_, std::min(maxValue_, value));
+    }
+
+    T GetValue(size_t index) const {
+        if (index >= values_.size()) {
+            throw std::out_of_range("Index out of range");
+        }
+        return values_[index];
+    }
+
+    void Reset() {
+        std::fill(values_.begin(), values_.end(), initialValue_);
+    }
+};
+
 // Container for managing parameters. Manages a collection of parameters, allowing adding and retrieving typed parameters.
 class ParameterContainer {
-    std::unordered_map<std::string, std::shared_ptr<Parameter>> parameters_;
+    std::unordered_map<std::string, std::shared_ptr<Parameter>> singleParameters_;
+    std::unordered_map<std::string, std::shared_ptr<void>> vectorParameters_;
 
 public:
     void AddParameter(const std::string& name, std::shared_ptr<Parameter> parameter) {
-        parameters_[name] = parameter;
+        singleParameters_[name] = std::move(parameter);
     }
 
     template<typename T>
     std::shared_ptr<TypedParameter<T>> GetParameter(const std::string& name) {
-        auto it = parameters_.find(name);
-        if (it != parameters_.end()) {
+        auto it = singleParameters_.find(name);
+        if (it != singleParameters_.end()) {
             return std::dynamic_pointer_cast<TypedParameter<T>>(it->second);
         }
         return nullptr;
     }
 
+    template<typename T>
+    void AddVectorParameter(const std::string& name, size_t size, T initialValue, T minValue, T maxValue) {
+        auto param = std::make_shared<TypedVectorParameter<T>>(size, initialValue, minValue, maxValue);
+        vectorParameters_[name] = param;
+    }
+
+    template<typename T>
+    std::shared_ptr<TypedVectorParameter<T>> GetVectorParameter(const std::string& name) {
+        auto it = vectorParameters_.find(name);
+        if (it != vectorParameters_.end()) {
+            return std::static_pointer_cast<TypedVectorParameter<T>>(it->second);
+        }
+        return nullptr;
+    }
+
     void ResetParameters() {
-        for (auto& [name, param] : parameters_) {
+        for (auto& [name, param] : singleParameters_) {
             param->Reset();
         }
     }
@@ -96,6 +143,7 @@ public:
 
     VegetationType GetVegetation() const { return vegetation_; }
     // void SetVegetation(VegetationType vegetation) { vegetation_ = vegetation; }
+
 
 private:
     int widthPosition_, depthPosition_;
@@ -174,6 +222,18 @@ public:
             throw std::runtime_error("There could be a problem, sizes of sides are not the same");
         }
         return width_;
+    }
+
+    int GetWidth() const {
+        return width_;
+    }
+
+    int GetDepth() const {
+        return depth_;
+    }
+
+    std::size_t GetTileIndex(const Tile* tile) const {
+        return static_cast<std::size_t>(tile->GetWidthPosition()) * GetDepth() + tile->GetDepthPosition();
     }
 
 private:
