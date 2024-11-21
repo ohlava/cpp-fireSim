@@ -68,4 +68,4 @@ Originally a school project, it's currently not under active development. Howeve
 
 
 ## Project Status
-The project was created as a school project. It is not active developt right now. But I would like to include more features, simplify and speed up current proccesses etc. in the future.
+The project was created as a school project. It is not actively developed right now. But I would like to include more features, simplify and speed up current proccesses etc. in the future.
